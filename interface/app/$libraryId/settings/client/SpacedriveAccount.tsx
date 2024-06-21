@@ -4,16 +4,22 @@ import { AuthRequiredOverlay } from '~/components/AuthRequiredOverlay';
 import { useLocale } from '~/hooks';
 
 export function SpacedriveAccount() {
+	const authState = auth.useStateSnapshot();
+	const me = useBridgeQuery(['auth.me'], { retry: false });
+
+	if (authState.status === 'loggedIn') {
+		me.refetch();
+	}
+
 	return (
 		<Card className="relative">
 			<AuthRequiredOverlay />
-			<Account />
+			<Account data={me.data!} />
 		</Card>
 	);
 }
 
-function Account() {
-	const me = useBridgeQuery(['auth.me'], { retry: false });
+function Account(props: { data: { id: string; email: string } }) {
 	const { t } = useLocale();
 
 	return (
@@ -25,7 +31,7 @@ function Account() {
 				</Button>
 			</div>
 			<hr className="mb-4 mt-2 w-full border-app-line" />
-			<span>{t('logged_in_as', { email: me.data?.email })}</span>
+			<span>{t('logged_in_as', { email: props.data.email })}</span>
 		</div>
 	);
 }
