@@ -1,6 +1,8 @@
+use qrcode::{render::svg, EcLevel, QrCode, Version};
 use rspc::alpha::AlphaRouter;
 use sd_core_sync::GetOpsArgs;
 use std::sync::atomic::Ordering;
+use tracing::debug;
 
 use crate::util::MaybeUndefined;
 
@@ -105,6 +107,22 @@ pub(crate) fn mount() -> AlphaRouter<Ctx> {
 							}
 						}
 					}
+				})
+		})
+		.procedure("qr", {
+			R.with2(library())
+				.query(|(_, library), _: ()| async move {
+					let code =
+						QrCode::with_version(b"https://www.spacedrive.com", Version::Normal(2), EcLevel::L).unwrap();
+
+					let image = code
+						.render()
+						.min_dimensions(200, 200)
+						.dark_color(svg::Color("#000000"))
+						.light_color(svg::Color("#ffffff"))
+						.build();
+
+					Ok(image)
 				})
 		})
 }

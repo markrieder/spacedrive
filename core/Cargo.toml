@@ -123,6 +123,7 @@ mini-moka = "0.10.3"
 notify = { git = "https://github.com/notify-rs/notify.git", rev = "c3929ed114fbb0bc7457a9a498260461596b00ca", default-features = false, features = [
 	"macos_fsevent",
 ] }
+qrcode = "0.13"
 serde-hashkey = "0.4.5"
 serde_repr = "0.1.19"
 serde_with = "3.8"
