@@ -1,3 +1,4 @@
+import { useBridgeQuery } from '@sd/client';
 import { Text } from 'react-native';
 import { Icon } from '~/components/icons/Icon';
 import ScreenContainer from '~/components/layout/ScreenContainer';
@@ -5,6 +6,9 @@ import { tw } from '~/lib/tailwind';
 import { NetworkStackScreenProps } from '~/navigation/tabs/NetworkStack';
 
 export default function NetworkScreen({ navigation }: NetworkStackScreenProps<'Network'>) {
+	const node = useBridgeQuery(['nodeState']);
+
+	console.log('node', node.data?.p2p);
 	return (
 		<ScreenContainer scrollview={false} style={tw`items-center justify-center gap-0`}>
 			<Icon name="Globe" size={128} />

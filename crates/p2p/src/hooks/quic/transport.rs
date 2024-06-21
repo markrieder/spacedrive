@@ -742,6 +742,8 @@ async fn start(
 									p2p.connected_to_outgoing(id, remote_metadata, req.to);
 
 									let _ = req.tx.send(Ok(UnicastStream::new(req.to, stream.compat())));
+
+									debug!("Successfully connected with '{}'", req.to);
 								},
 								Err(e) => {
 									let _ = req.tx.send(Err(e.to_string()));

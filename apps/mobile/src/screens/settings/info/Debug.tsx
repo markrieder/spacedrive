@@ -21,6 +21,7 @@ const DebugScreen = ({ navigation }: SettingsStackScreenProps<'Debug'>) => {
 	const setOrigin = useBridgeMutation(['cloud.setApiOrigin']);
 
 	const queryClient = useQueryClient();
+	const editNode = useBridgeMutation('nodes.edit');
 
 	return (
 		<View style={tw`flex-1 p-4`}>
@@ -70,6 +71,26 @@ const DebugScreen = ({ navigation }: SettingsStackScreenProps<'Debug'>) => {
 					}}
 				>
 					<Text style={tw`text-ink`}>Logout</Text>
+				</Button>
+				<Button
+					onPress={async () =>
+						await editNode.mutateAsync({
+							name: null,
+							p2p_port: { type: 'random' },
+							p2p_disabled: false,
+							p2p_ipv6_disabled: true,
+							p2p_relay_disabled: false,
+							p2p_discovery: 'Everyone',
+							p2p_remote_access: true,
+							p2p_manual_peers: [],
+							image_labeler_version: null
+						})
+					}
+				>
+					<Text style={tw`text-ink`}>Enable p2p</Text>
+				</Button>
+				<Button onPress={() => toggleFeatureFlag('wipP2P')}>
+					<Text style={tw`text-ink`}>Toggle wipP2P Feature Flag</Text>
 				</Button>
 			</Card>
 		</View>
