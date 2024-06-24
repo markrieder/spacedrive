@@ -100,7 +100,7 @@ export const ConvertObject = new ConditionalItem({
 
 		return { kind, selectedObjects, selectedItems };
 	},
-	Component: ({ kind }) => {
+	Component: ({ kind, selectedItems }) => {
 		const { t } = useLocale();
 		return (
 			<Menu.SubMenu
@@ -113,7 +113,7 @@ export const ConvertObject = new ConditionalItem({
 						));
 					}}
 					key={ext} label={ext}
-					 disabled />
+				 />
 				))}
 			</Menu.SubMenu>
 		);
