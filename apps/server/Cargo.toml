@@ -6,18 +6,24 @@ repository = { workspace = true }
 edition = { workspace = true }
 
 [features]
+default = []
 assets = []
+ai-models = ["sd-core/ai"]
 
 [dependencies]
-sd-core = { path = "../../core", features = [
-	"ffmpeg",
-	"location-watcher",
-	"heif",
-] }
+# Spacedrive Sub-crates
+sd-core = { path = "../../core", features = ["ffmpeg", "heif"] }
+
+# Workspace dependencies
+axum = { workspace = true, features = ["headers"] }
+base64 = { workspace = true }
+http = { workspace = true }
 rspc = { workspace = true, features = ["axum"] }
-axum = "0.6.20"
+tempfile = { workspace = true }
 tokio = { workspace = true, features = ["sync", "rt-multi-thread", "signal"] }
 tracing = { workspace = true }
-http = "0.2.9"
+
+# Specific Desktop dependencies
 include_dir = "0.7.3"
-mime_guess = "2.0.4"
+mime_guess = "2.0"
+secstr = "0.5.1"

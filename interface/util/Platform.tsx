@@ -1,15 +1,30 @@
 import { createContext, useContext, type PropsWithChildren } from 'react';
-import { auth } from '@sd/client';
+import { ThumbKey, auth } from '@sd/client';
 
 export type OperatingSystem = 'browser' | 'linux' | 'macOS' | 'windows' | 'unknown';
+
+// This is copied from the Tauri Specta output.
+// It will only exist on desktop
+export type DragAndDropEvent =
+	| { type: 'Hovered'; paths: string[]; x: number; y: number }
+	| { type: 'Dropped'; paths: string[]; x: number; y: number }
+	| { type: 'Cancelled' };
+
+export type Result<T, E> = { status: 'ok'; data: T } | { status: 'error'; error: E };
+export type OpenWithApplication = { url: string; name: string };
 
 // Platform represents the underlying native layer the app is running on.
 // This could be Tauri or web.
 export type Platform = {
 	platform: 'web' | 'tauri'; // This represents the specific platform implementation
-	getThumbnailUrlByThumbKey: (thumbKey: string[]) => string;
+	getThumbnailUrlByThumbKey: (thumbKey: ThumbKey) => string;
 	getFileUrl: (libraryId: string, locationLocalId: number, filePathId: number) => string;
 	getFileUrlByPath: (path: string) => string;
+	getRemoteRspcEndpoint: (remote_identity: string) => {
+		url: string;
+		headers?: Record<string, string>;
+	};
+	constructRemoteRspcPath: (remote_identity: string, path: string) => string;
 	openLink: (url: string) => void;
 	// Tauri patches `window.confirm` to return `Promise` not `bool`
 	confirm(msg: string, cb: (result: boolean) => void): void;
@@ -24,6 +39,7 @@ export type Platform = {
 	showDevtools?(): void;
 	openPath?(path: string): void;
 	openLogsDir?(): void;
+	openTrashInOsExplorer?(): void;
 	userHomeDir?(): Promise<string>;
 	// Opens a file path with a given ID
 	openFilePaths?(library: string, ids: number[]): any;
@@ -36,14 +52,19 @@ export type Platform = {
 			| { Ephemeral: { path: string } }
 		)[]
 	): Promise<unknown>;
-	getFilePathOpenWithApps?(library: string, ids: number[]): Promise<unknown>;
+	requestFdaMacos?(): void;
+	getFilePathOpenWithApps?(
+		library: string,
+		ids: number[]
+	): Promise<Result<OpenWithApplication[], null>>;
 	reloadWebview?(): Promise<unknown>;
-	getEphemeralFilesOpenWithApps?(paths: string[]): Promise<unknown>;
+	getEphemeralFilesOpenWithApps?(paths: string[]): Promise<Result<OpenWithApplication[], null>>;
 	openFilePathWith?(library: string, fileIdsAndAppUrls: [number, string][]): Promise<unknown>;
 	openEphemeralFileWith?(pathsAndUrls: [string, string][]): Promise<unknown>;
 	refreshMenuBar?(): Promise<unknown>;
 	setMenuBarItemState?(id: string, enabled: boolean): Promise<unknown>;
 	lockAppTheme?(themeType: 'Auto' | 'Light' | 'Dark'): any;
+	subscribeToDragAndDropEvents?(callback: (event: DragAndDropEvent) => void): Promise<() => void>;
 	updater?: {
 		useSnapshot: () => UpdateStore;
 		checkForUpdate(): Promise<Update | null>;
@@ -54,7 +75,7 @@ export type Platform = {
 	landingApiOrigin: string;
 };
 
-export type Update = { version: string; body: string | null };
+export type Update = { version: string };
 export type UpdateStore =
 	| { status: 'idle' }
 	| { status: 'loading' }

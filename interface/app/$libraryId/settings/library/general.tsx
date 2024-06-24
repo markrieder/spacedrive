@@ -1,6 +1,12 @@
-import { MaybeUndefined, useBridgeMutation, useLibraryContext, useZodForm } from '@sd/client';
+import {
+	MaybeUndefined,
+	useBridgeMutation,
+	useLibraryContext,
+	useLibraryMutation,
+	useZodForm
+} from '@sd/client';
 import { Button, dialogManager, Form, InputField, Switch, Tooltip, z } from '@sd/ui';
-import { useDebouncedFormWatch } from '~/hooks';
+import { useDebouncedFormWatch, useLocale } from '~/hooks';
 
 import { Heading } from '../Layout';
 import DeleteLibraryDialog from '../node/libraries/DeleteDialog';
@@ -20,6 +26,9 @@ function toMaybeUndefined<T>(v: T | null | undefined): MaybeUndefined<T> {
 export const Component = () => {
 	const { library } = useLibraryContext();
 	const editLibrary = useBridgeMutation('library.edit');
+	const vaccumLibrary = useLibraryMutation('library.vaccumDb');
+
+	const { t } = useLocale();
 
 	const form = useZodForm({
 		schema,
@@ -44,8 +53,8 @@ export const Component = () => {
 		<Form form={form}>
 			<div className="flex w-full max-w-4xl flex-col space-y-6 pb-5">
 				<Heading
-					title="Library Settings"
-					description="General settings related to the currently active library."
+					title={t('library_settings')}
+					description={t('library_settings_description')}
 				/>
 
 				<input type="hidden" {...form.register('id')} />
@@ -53,13 +62,13 @@ export const Component = () => {
 				<div className="flex flex-row space-x-5 pb-3">
 					<InputField
 						size="md"
-						label="Name"
+						label={t('name')}
 						formFieldClassName="flex-1"
 						defaultValue="My Default Library"
 						{...form.register('name', { required: true })}
 					/>
 					<InputField
-						label="Description"
+						label={t('description')}
 						size="md"
 						formFieldClassName="flex-1"
 						{...form.register('description')}
@@ -68,21 +77,25 @@ export const Component = () => {
 
 				<Setting
 					mini
-					title="Encrypt Library"
-					description="Enable encryption for this library, this will only encrypt the Spacedrive database, not the files themselves."
+					title={t('encrypt_library')}
+					description={t('encrypt_library_description')}
 				>
 					<div className="ml-3 flex items-center">
-						<Tooltip label="Library encryption coming soon">
+						<Tooltip label={t('encrypt_library_coming_soon')}>
 							<Switch disabled size="md" checked={false} />
 						</Tooltip>
 					</div>
 				</Setting>
 
-				<Setting mini title="Export Library" description="Export this library to a file.">
+				<Setting
+					mini
+					title={t('export_library')}
+					description={t('export_library_description')}
+				>
 					<div className="mt-2">
-						<Tooltip label="Export Library coming soon">
-							<Button disabled size="sm" variant="gray">
-								Export
+						<Tooltip label={t('export_library_coming_soon')}>
+							<Button disabled size="sm" variant="gray" className="whitespace-nowrap">
+								{t('export')}
 							</Button>
 						</Tooltip>
 					</div>
@@ -90,21 +103,39 @@ export const Component = () => {
 
 				<Setting
 					mini
-					title="Delete Library"
-					description="This is permanent, your files will not be deleted, only the Spacedrive library."
+					title={t('vaccum_library')}
+					description={t('vaccum_library_description')}
+				>
+					<div className="mt-2">
+						<Button
+							onClick={() => vaccumLibrary.mutate(null)}
+							disabled={vaccumLibrary.isLoading}
+							size="sm"
+							variant="gray"
+							className="whitespace-nowrap"
+						>
+							{t('vaccum')}
+						</Button>
+					</div>
+				</Setting>
+
+				<Setting
+					mini
+					title={t('delete_library')}
+					description={t('delete_library_description')}
 				>
 					<div className="mt-2">
 						<Button
 							size="sm"
 							variant="colored"
-							className="border-red-500 bg-red-500"
+							className="whitespace-nowrap border-red-500 bg-red-500"
 							onClick={() => {
 								dialogManager.create((dp) => (
 									<DeleteLibraryDialog {...dp} libraryUuid={library.uuid} />
 								));
 							}}
 						>
-							Delete
+							{t('delete')}
 						</Button>
 					</div>
 				</Setting>

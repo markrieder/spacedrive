@@ -10,9 +10,11 @@
 		"dotenv",
 		"dotenvy",
 		"fontsource",
+		"ianvs",
 		"ipfs",
 		"Keepsafe",
 		"nodestate",
+		"normalise",
 		"overscan",
 		"pathctx",
 		"prismjs",
@@ -26,7 +28,6 @@
 		"tailwindcss",
 		"tanstack",
 		"titlebar",
-		"ianvs",
 		"tsparticles",
 		"unlisten",
 		"upsert",
@@ -43,6 +44,7 @@
 		"tw\\.[^`]+`([^`]*)`", // tw.xxx`...`
 		"tw\\(.*?\\).*?`([^`]*)", // tw(....)`...`
 		"tw`([^`]*)", // tw`...` (mobile)
+		"twStyle(([^)]*)", // twStyle(....) (mobile)
 		"twStyle\\(([^)]*)\\)", // twStyle(....) (mobile)
 		["styled\\([^,)]+,([^)]*)\\)", "[\"'`]([^\"'`]*).*?[\"'`]"] // styled(....)`...` (mobile)
 	],
@@ -77,10 +79,28 @@
 		"*.tsx": "${capture}.ts",
 		".npmrc": ".nvmrc, .yarnrc.yml",
 		".gitignore": ".eslintignore, .prettierignore",
-		"README.md": "CONTRIBUTING.md, CODE_OF_CONDUCT.md",
+		"README.md": "CONTRIBUTING.md, CODE_OF_CONDUCT.md, SECURITY.md",
 		"Cargo.toml": "Cargo.lock",
 		".eslintrc.js": ".eslintcache",
 		"package.json": "package-lock.json, yarn.lock, pnpm-lock.yaml, pnpm-workspace.yaml, .pnp.cjs, .pnp.loader.mjs",
 		"tsconfig.json": "tsconfig.*.json"
-	}
+	},
+	"rust-analyzer.linkedProjects": [],
+	"rust-analyzer.cargo.extraEnv": {},
+	"rust-analyzer.check.targets": null,
+	"rust-analyzer.showUnlinkedFileNotification": false,
+	"i18n-ally.localesPaths": [
+		"interface/locales",
+		"apps/mobile/ios/Pods/RCT-Folly/folly/lang",
+		"apps/mobile/ios/Pods/boost/boost/locale",
+		"apps/mobile/ios/Pods/boost/boost/predef/language"
+	],
+	"i18n-ally.enabledParsers": ["ts", "json"],
+	"i18n-ally.sortKeys": true,
+	"i18n-ally.namespace": true,
+	"i18n-ally.pathMatcher": "{locale}/common.json",
+	"i18n-ally.enabledFrameworks": ["react"],
+	"i18n-ally.keystyle": "flat",
+	// You need to add this to your locale settings file "i18n-ally.translate.google.apiKey": "xxx"
+	"i18n-ally.translate.engines": ["google"]
 }

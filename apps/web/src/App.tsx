@@ -2,7 +2,13 @@ import { hydrate, QueryClient, QueryClientProvider } from '@tanstack/react-query
 import { useEffect, useRef, useState } from 'react';
 import { createBrowserRouter } from 'react-router-dom';
 import { RspcProvider } from '@sd/client';
-import { Platform, PlatformProvider, routes, SpacedriveInterface } from '@sd/interface';
+import {
+	createRoutes,
+	Platform,
+	PlatformProvider,
+	SpacedriveInterfaceRoot,
+	SpacedriveRouterProvider
+} from '@sd/interface';
 import { useShowControls } from '@sd/interface/hooks';
 
 import demoData from './demoData.json';
@@ -36,13 +42,22 @@ const spacedriveURL = (() => {
 
 const platform: Platform = {
 	platform: 'web',
-	getThumbnailUrlByThumbKey: (keyParts) =>
-		`${spacedriveURL}/thumbnail/${keyParts.map((i) => encodeURIComponent(i)).join('/')}.webp`,
+	getThumbnailUrlByThumbKey: (thumbKey) =>
+		`${spacedriveURL}/thumbnail/${encodeURIComponent(
+			thumbKey.base_directory_str
+		)}/${encodeURIComponent(thumbKey.shard_hex)}/${encodeURIComponent(thumbKey.cas_id)}.webp`,
 	getFileUrl: (libraryId, locationLocalId, filePathId) =>
 		`${spacedriveURL}/file/${encodeURIComponent(libraryId)}/${encodeURIComponent(
 			locationLocalId
 		)}/${encodeURIComponent(filePathId)}`,
 	getFileUrlByPath: (path) => `${spacedriveURL}/local-file-by-path/${encodeURIComponent(path)}`,
+	getRemoteRspcEndpoint: (remote_identity) => ({
+		url: `${spacedriveURL
+			.replace('https', 'wss')
+			.replace('http', 'ws')}/remote/${encodeURIComponent(remote_identity)}/rspc/ws`
+	}),
+	constructRemoteRspcPath: (remote_identity, path) =>
+		`${spacedriveURL}/remote/${encodeURIComponent(remote_identity)}/uri/${path}`,
 	openLink: (url) => window.open(url, '_blank')?.focus(),
 	confirm: (message, cb) => cb(window.confirm(message)),
 	auth: {
@@ -75,33 +90,10 @@ const queryClient = new QueryClient({
 	}
 });
 
+const routes = createRoutes(platform);
+
 function App() {
-	const [router, setRouter] = useState(() => {
-		const router = createBrowserRouter(routes);
-
-		router.subscribe((event) => {
-			setRouter((router) => {
-				const currentIndex: number | undefined = history.state?.idx;
-				if (currentIndex === undefined) return router;
-
-				return {
-					...router,
-					currentIndex,
-					maxIndex:
-						event.historyAction === 'PUSH'
-							? currentIndex
-							: // sometimes the max index is 0 when the current index is > 0, like when reloading the page -_-
-							  Math.max(router.maxIndex, currentIndex)
-				};
-			});
-		});
-
-		return {
-			router,
-			currentIndex: 0,
-			maxIndex: 0
-		};
-	});
+	const router = useRouter();
 
 	const domEl = useRef<HTMLDivElement>(null);
 	const { isEnabled: showControls } = useShowControls();
@@ -122,12 +114,16 @@ function App() {
 				<RspcProvider queryClient={queryClient}>
 					<PlatformProvider platform={platform}>
 						<QueryClientProvider client={queryClient}>
-							<SpacedriveInterface
-								routing={{
-									...router,
-									routerKey: 0
-								}}
-							/>
+							<SpacedriveInterfaceRoot>
+								<SpacedriveRouterProvider
+									routing={{
+										...router,
+										tabId: '',
+										routes,
+										visible: true
+									}}
+								/>
+							</SpacedriveInterfaceRoot>
 						</QueryClientProvider>
 					</PlatformProvider>
 				</RspcProvider>
@@ -137,3 +133,37 @@ function App() {
 }
 
 export default App;
+
+function useRouter() {
+	const [router, setRouter] = useState(() => {
+		const router = createBrowserRouter(routes);
+
+		router.subscribe((event) => {
+			// we don't care about non-idle events as those are artifacts of form mutations + suspense
+			if (event.navigation.state !== 'idle') return;
+
+			setRouter((router) => {
+				const currentIndex: number | undefined = history.state?.idx;
+				if (currentIndex === undefined) return router;
+
+				return {
+					...router,
+					currentIndex,
+					maxIndex:
+						event.historyAction === 'PUSH'
+							? currentIndex
+							: // sometimes the max index is 0 when the current index is > 0, like when reloading the page -_-
+								Math.max(router.maxIndex, currentIndex)
+				};
+			});
+		});
+
+		return {
+			router,
+			currentIndex: 0,
+			maxIndex: 0
+		};
+	});
+
+	return router;
+}

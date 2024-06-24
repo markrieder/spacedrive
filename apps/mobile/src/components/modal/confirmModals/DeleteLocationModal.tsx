@@ -1,16 +1,18 @@
+import { useLibraryMutation, usePlausibleEvent, useRspcLibraryContext } from '@sd/client';
 import { useRef } from 'react';
-import { useLibraryMutation, usePlausibleEvent } from '@sd/client';
 import { ConfirmModal, ModalRef } from '~/components/layout/Modal';
+import { toast } from '~/components/primitive/Toast';
 
 type Props = {
 	locationId: number;
 	onSubmit?: () => void;
 	trigger: React.ReactNode;
+	triggerStyle?: string;
 };
 
-const DeleteLocationModal = ({ trigger, onSubmit, locationId }: Props) => {
+const DeleteLocationModal = ({ trigger, onSubmit, locationId, triggerStyle }: Props) => {
 	const modalRef = useRef<ModalRef>(null);
-
+	const rspc = useRspcLibraryContext();
 	const submitPlausibleEvent = usePlausibleEvent();
 
 	const { mutate: deleteLoc, isLoading: deleteLocLoading } = useLibraryMutation(
@@ -19,9 +21,14 @@ const DeleteLocationModal = ({ trigger, onSubmit, locationId }: Props) => {
 			onSuccess: () => {
 				submitPlausibleEvent({ event: { type: 'locationDelete' } });
 				onSubmit?.();
+				toast.success('Location deleted successfully');
+			},
+			onError: (error) => {
+				toast.error(error.message);
 			},
 			onSettled: () => {
 				modalRef.current?.close();
+				rspc.queryClient.invalidateQueries(['locations.list']);
 			}
 		}
 	);
@@ -33,6 +40,7 @@ const DeleteLocationModal = ({ trigger, onSubmit, locationId }: Props) => {
 			ctaLabel="Delete"
 			ctaAction={() => deleteLoc(locationId)}
 			loading={deleteLocLoading}
+			triggerStyle={triggerStyle}
 			trigger={trigger}
 			ctaDanger
 		/>

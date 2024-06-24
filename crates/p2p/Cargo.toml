@@ -1,6 +1,6 @@
 [package]
 name = "sd-p2p"
-version = "0.1.0"
+version = "0.2.0"
 description = "Rust Peer to Peer Networking Library"
 authors = ["Oscar Beaumont <oscar@otbeaumont.me>"]
 readme = "README.md"
@@ -8,12 +8,24 @@ license = { workspace = true }
 repository = { workspace = true }
 edition = { workspace = true }
 
+# TODO: Remove features??? and dependencies
+
 [features]
 default = []
-serde = []
 specta = []
 
 [dependencies]
+# Workspace dependencies
+base64 = { workspace = true }
+base91 = { workspace = true }
+ed25519-dalek = { workspace = true }
+futures = { workspace = true }
+pin-project-lite = { workspace = true }
+reqwest = { workspace = true }
+rmp-serde = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+specta = { workspace = true }
+thiserror = { workspace = true }
 tokio = { workspace = true, features = [
 	"macros",
 	"sync",
@@ -21,30 +33,40 @@ tokio = { workspace = true, features = [
 	"io-util",
 	"fs",
 ] }
-libp2p = { version = "0.52.4", features = ["tokio", "serde"] }
-libp2p-quic = { version = "0.9.3", features = ["tokio"] }
-if-watch = { version = "=3.1.0", features = [
-	"tokio",
-] } # Override the features of if-watch which is used by libp2p-quic
-mdns-sd = "0.9.3"
-thiserror = "1.0.50"
+tokio-stream = { workspace = true, features = ["sync"] }
+tokio-util = { workspace = true, features = ["compat"] }
 tracing = { workspace = true }
-serde = { version = "1.0.190", features = [
-	"derive",
-] } # TODO: Optional or remove feature
-specta = { workspace = true }
-flume = "0.10.0" # Must match version used by `mdns-sd`
-tokio-util = { version = "0.7.10", features = ["compat"] }
-ed25519-dalek = { version = "2.0.0", features = [] }
-rand_core = { version = "0.6.4" }
-uuid = "1.5.0"
+uuid = { workspace = true, features = ["serde"] }
+
+# Specific P2P dependencies
+dns-lookup = "2.0"
+flume = "=0.11.0" # Must match version used by `mdns-sd`
+futures-core = "0.3.30"
+hash_map_diff = "0.2.0"
+if-watch = { version = "=3.2.0", features = [
+	"tokio",
+] } # Override features used by libp2p-quic
+libp2p = { version = "=0.53.2", features = [
+	"tokio",
+	"serde",
+	"macros",
+	"quic",
+	"autonat",
+	"relay",
+	"yamux",
+	"noise",
+	"dcutr",
+] } # Update blocked due to custom patch
+libp2p-stream = "=0.1.0-alpha" # Update blocked due to custom patch
+mdns-sd = "0.11.1"
+rand_core = "0.6.4"
+sha256 = "1.5.0"
+stable-vec = "0.4.1"
 streamunordered = "0.5.3"
-futures-core = "0.3.29"
-tokio-stream = { version = "0.1.14", features = ["sync"] }
-pin-project-lite = "0.2.13"
-base64 = "0.21.5"
+sync_wrapper = "1.0"
+zeroize = { version = "1.8", features = ["derive"] }
 
 [dev-dependencies]
-tokio = { workspace = true, features = ["rt-multi-thread"] }
-tracing-subscriber = { workspace = true, features = ["env-filter"] }
-uuid = { version = "1.5.0", features = ["v4"] }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
+tracing-subscriber = { workspace = true }
+uuid = { workspace = true, features = ["v4"] }

@@ -1,13 +1,17 @@
+import { type AlphaClient } from '@oscartbeaumont-sd/rspc-client/v2';
 import { ArrowLeft, ArrowRight, Info } from '@phosphor-icons/react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { iconNames } from '@sd/assets/util';
 import clsx from 'clsx';
 import { memo, Suspense, useDeferredValue, useMemo } from 'react';
-import { useLocation } from 'react-router';
 import {
 	ExplorerItem,
 	getExplorerItemData,
-	useLibraryQuery,
+	ItemData,
+	nonIndexedPathOrderingSchema,
+	SortOrder,
+	useLibraryContext,
+	useUnsafeStreamedQuery,
 	type EphemeralPathOrder
 } from '@sd/client';
 import { Button, Tooltip } from '@sd/ui';
@@ -18,6 +22,7 @@ import {
 	useDismissibleNoticeStore,
 	useIsDark,
 	useKeyDeleteFile,
+	useLocale,
 	useOperatingSystem,
 	useZodSearchParams
 } from '~/hooks';
@@ -25,16 +30,12 @@ import { useRouteTitle } from '~/hooks/useRouteTitle';
 
 import Explorer from './Explorer';
 import { ExplorerContextProvider } from './Explorer/Context';
-import {
-	createDefaultExplorerSettings,
-	getExplorerStore,
-	nonIndexedPathOrderingSchema
-} from './Explorer/store';
+import { createDefaultExplorerSettings, explorerStore } from './Explorer/store';
 import { DefaultTopBarOptions } from './Explorer/TopBarOptions';
 import { useExplorer, useExplorerSettings } from './Explorer/useExplorer';
-import { EmptyNotice } from './Explorer/View';
+import { EmptyNotice } from './Explorer/View/EmptyNotice';
 import { AddLocationButton } from './settings/library/locations/AddLocationButton';
-import { useTopBarContext } from './TopBar/Layout';
+import { useTopBarContext } from './TopBar/Context';
 import { TopBarPortal } from './TopBar/Portal';
 import TopBarButton from './TopBar/TopBarButton';
 
@@ -58,7 +59,7 @@ const NOTICE_ITEMS: { icon: keyof typeof iconNames; name: string }[] = [
 ];
 
 const EphemeralNotice = ({ path }: { path: string }) => {
-	useRouteTitle(path);
+	const { t } = useLocale();
 
 	const isDark = useIsDark();
 	const { ephemeral: dismissed } = useDismissibleNoticeStore();
@@ -71,7 +72,7 @@ const EphemeralNotice = ({ path }: { path: string }) => {
 		<Dialog.Root open={!dismissed}>
 			<Dialog.Portal>
 				<Dialog.Overlay className="fixed inset-0 z-50 bg-app/80 backdrop-blur-sm radix-state-closed:animate-out radix-state-closed:fade-out-0 radix-state-open:animate-in radix-state-open:fade-in-0" />
-				<Dialog.Content className="fixed left-[50%] top-[50%] z-50 w-96 translate-x-[-50%] translate-y-[-50%] overflow-hidden rounded-md border border-app-line bg-app shadow-lg outline-none duration-200 radix-state-closed:animate-out radix-state-closed:fade-out-0 radix-state-closed:zoom-out-95 radix-state-closed:slide-out-to-left-1/2 radix-state-closed:slide-out-to-top-[48%] radix-state-open:animate-in radix-state-open:fade-in-0 radix-state-open:zoom-in-95 radix-state-open:slide-in-from-left-1/2 radix-state-open:slide-in-from-top-[48%]">
+				<Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-96 -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-md border border-app-line bg-app shadow-lg outline-none duration-200 radix-state-closed:animate-out radix-state-closed:fade-out-0 radix-state-closed:zoom-out-95 radix-state-closed:slide-out-to-left-1/2 radix-state-closed:slide-out-to-top-[48%] radix-state-open:animate-in radix-state-open:fade-in-0 radix-state-open:zoom-in-95 radix-state-open:slide-in-from-left-1/2 radix-state-open:slide-in-from-top-[48%]">
 					<div className="relative flex aspect-video overflow-hidden border-b border-app-line/50 bg-gradient-to-b from-app-darkBox to-app to-80% pl-5 pt-5">
 						<div
 							className={clsx(
@@ -96,7 +97,7 @@ const EphemeralNotice = ({ path }: { path: string }) => {
 								</div>
 
 								<Tooltip
-									label="Add path as an indexed location"
+									label={t('add_location_tooltip')}
 									className="z-50 w-max min-w-0 shrink animate-pulse [animation-duration:_3000ms] hover:animate-none"
 								>
 									<AddLocationButton
@@ -126,17 +127,18 @@ const EphemeralNotice = ({ path }: { path: string }) => {
 
 					<div className="p-3 pt-0">
 						<div className="py-4 text-center">
-							<h2 className="text-lg font-semibold text-ink">Local Locations</h2>
+							<h2 className="text-lg font-semibold text-ink">
+								{t('local_locations')}
+							</h2>
 							<p className="mt-px text-sm text-ink-dull">
-								Browse your files and folders directly from your device.
+								{t('ephemeral_notice_browse')}
 							</p>
 						</div>
 
 						<div className="flex items-center rounded-md border border-app-line bg-app-box px-3 py-2 text-ink-faint">
 							<Info size={20} weight="light" className="mr-2.5 shrink-0" />
 							<p className="text-sm font-light">
-								Consider indexing your local locations for a faster and more
-								efficient exploration.
+								{t('ephemeral_notice_consider_indexing')}
 							</p>
 						</div>
 
@@ -146,7 +148,7 @@ const EphemeralNotice = ({ path }: { path: string }) => {
 							size="md"
 							onClick={dismiss}
 						>
-							Got it
+							{t('got_it')}
 						</Button>
 					</div>
 				</Dialog.Content>
@@ -156,8 +158,9 @@ const EphemeralNotice = ({ path }: { path: string }) => {
 };
 
 const EphemeralExplorer = memo((props: { args: PathParams }) => {
-	const os = useOperatingSystem();
 	const { path } = props.args;
+
+	const os = useOperatingSystem();
 
 	const explorerSettings = useExplorerSettings({
 		settings: useMemo(
@@ -175,28 +178,40 @@ const EphemeralExplorer = memo((props: { args: PathParams }) => {
 
 	const settingsSnapshot = explorerSettings.useSettingsSnapshot();
 
-	const query = useLibraryQuery(
+	const libraryCtx = useLibraryContext();
+	const query = useUnsafeStreamedQuery(
 		[
 			'search.ephemeralPaths',
 			{
-				path: path ?? (os === 'windows' ? 'C:\\' : '/'),
-				withHiddenFiles: settingsSnapshot.showHiddenFiles,
-				order: settingsSnapshot.order
+				library_id: libraryCtx.library.uuid,
+				arg: {
+					path: path ?? (os === 'windows' ? 'C:\\' : '/'),
+					withHiddenFiles: settingsSnapshot.showHiddenFiles,
+					order: settingsSnapshot.order
+				}
 			}
 		],
 		{
 			enabled: path != null,
 			suspense: true,
-			onSuccess: () => getExplorerStore().resetNewThumbnails()
+			onSuccess: () => explorerStore.resetCache(),
+			onBatch: (item) => {}
 		}
 	);
 
+	const entries = useMemo(() => {
+		return (
+			query.data?.flatMap((item) => item.entries) ||
+			query.streaming.flatMap((item) => item.entries)
+		);
+	}, [query.streaming, query.data]);
+
 	const items = useMemo(() => {
-		if (!query.data) return [];
+		if (!entries) return [];
 
 		const ret: ExplorerItem[] = [];
 
-		for (const item of query.data.entries) {
+		for (const item of entries) {
 			if (settingsSnapshot.layoutMode !== 'media') ret.push(item);
 			else {
 				const { kind } = getExplorerItemData(item);
@@ -206,7 +221,7 @@ const EphemeralExplorer = memo((props: { args: PathParams }) => {
 		}
 
 		return ret;
-	}, [query.data, settingsSnapshot.layoutMode]);
+	}, [entries, settingsSnapshot.layoutMode]);
 
 	const explorer = useExplorer({
 		items,
@@ -217,14 +232,13 @@ const EphemeralExplorer = memo((props: { args: PathParams }) => {
 
 	useKeyDeleteFile(explorer.selectedItems, null);
 
+	const { t } = useLocale();
+
 	return (
 		<ExplorerContextProvider explorer={explorer}>
 			<TopBarPortal
 				left={
-					<Tooltip
-						label="Add path as an indexed location"
-						className="w-max min-w-0 shrink"
-					>
+					<Tooltip label={t('add_location_tooltip')} className="w-max min-w-0 shrink">
 						<AddLocationButton path={path} />
 					</Tooltip>
 				}
@@ -235,7 +249,7 @@ const EphemeralExplorer = memo((props: { args: PathParams }) => {
 					<EmptyNotice
 						loading={query.isFetching}
 						icon={<Icon name="FolderNoSpace" size={128} />}
-						message="No files found here"
+						message={t('location_empty_notice_message')}
 					/>
 				}
 			/>
@@ -247,6 +261,8 @@ export const Component = () => {
 	const [pathParams] = useZodSearchParams(PathParamsSchema);
 
 	const path = useDeferredValue(pathParams);
+
+	useRouteTitle(path.path ?? '');
 
 	return (
 		<Suspense>

@@ -1,13 +1,18 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
+import { useFeatureFlag } from '@sd/client';
 import { Button, Form, InputField } from '@sd/ui';
 import { Icon } from '~/components';
+import { useLocale, useOperatingSystem } from '~/hooks';
 
 import { OnboardingContainer, OnboardingDescription, OnboardingTitle } from './components';
 import { useOnboardingContext } from './context';
 
 export default function OnboardingNewLibrary() {
+	const { t } = useLocale();
+
 	const navigate = useNavigate();
+	const os = useOperatingSystem();
 	const form = useOnboardingContext().forms.useForm('new-library');
 
 	const [importMode, setImportMode] = useState(false);
@@ -16,29 +21,28 @@ export default function OnboardingNewLibrary() {
 		// TODO
 	};
 
+	const cloudFeatureFlag = useFeatureFlag('cloudSync');
+
 	return (
 		<Form
 			form={form}
 			onSubmit={form.handleSubmit(() => {
-				navigate('../locations', { replace: true });
+				navigate(`../${os === 'macOS' ? 'full-disk' : 'locations'}`, { replace: true });
 			})}
 		>
 			<OnboardingContainer>
-				<Icon name="Database" size={80} className="mb-2" />
-				<OnboardingTitle>Create a Library</OnboardingTitle>
-				<OnboardingDescription>
-					Libraries are a secure, on-device database. Your files remain where they are,
-					the Library catalogs them and stores all Spacedrive related data.
-				</OnboardingDescription>
+				<Icon name="Database" size={80} />
+				<OnboardingTitle>{t('create_library')}</OnboardingTitle>
+				<OnboardingDescription>{t('create_library_description')}</OnboardingDescription>
 
 				{importMode ? (
 					<div className="mt-7 space-x-2">
 						<Button onClick={handleImport} variant="accent" size="sm">
-							Import
+							{t('import')}
 						</Button>
-						<span className="px-2 text-xs font-bold text-ink-faint">OR</span>
+						<span className="px-2 text-xs font-bold text-ink-faint">{t('or')}</span>
 						<Button onClick={() => setImportMode(false)} variant="outline" size="sm">
-							Create new library
+							{t('create_new_library')}
 						</Button>
 					</div>
 				) : (
@@ -58,13 +62,25 @@ export default function OnboardingNewLibrary() {
 								size="sm"
 								disabled={!form.formState.isValid}
 							>
-								New library
+								{t('new_library')}
 							</Button>
 							{/* <span className="px-2 text-xs font-bold text-ink-faint">OR</span>
 							<Button onClick={() => setImportMode(true)} variant="outline" size="sm">
 								Import library
 							</Button> */}
 						</div>
+						{cloudFeatureFlag && (
+							<>
+								<span className="my-4 text-sm text-ink-faint">{t('or')}</span>
+								<Button
+									onClick={() => {
+										navigate('../join-library');
+									}}
+								>
+									{t('join_library')}
+								</Button>
+							</>
+						)}
 					</>
 				)}
 			</OnboardingContainer>

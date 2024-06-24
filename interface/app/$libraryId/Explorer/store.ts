@@ -1,68 +1,28 @@
-import type { ReadonlyDeep } from 'type-fest';
-import { proxy, useSnapshot } from 'valtio';
+import { proxy } from 'valtio';
 import { proxySet } from 'valtio/utils';
 import { z } from 'zod';
 import {
+	ThumbKey,
 	resetStore,
 	type DoubleClickAction,
 	type ExplorerItem,
 	type ExplorerLayout,
 	type ExplorerSettings,
-	type SortOrder
+	type Ordering
 } from '@sd/client';
+import i18n from '~/app/I18n';
+
+import {
+	DEFAULT_LIST_VIEW_ICON_SIZE,
+	DEFAULT_LIST_VIEW_TEXT_SIZE,
+	LIST_VIEW_ICON_SIZES,
+	LIST_VIEW_TEXT_SIZES
+} from './View/ListView/useTable';
 
 export enum ExplorerKind {
 	Location,
 	Tag,
 	Space
-}
-
-export type Ordering = { field: string; value: SortOrder | Ordering };
-// branded type for added type-safety
-export type OrderingKey = string & {};
-
-type OrderingValue<T extends Ordering, K extends string> = Extract<T, { field: K }>['value'];
-
-export type OrderingKeys<T extends Ordering> = T extends Ordering
-	? {
-			[K in T['field']]: OrderingValue<T, K> extends SortOrder
-				? K
-				: OrderingValue<T, K> extends Ordering
-				? `${K}.${OrderingKeys<OrderingValue<T, K>>}`
-				: never;
-	  }[T['field']]
-	: never;
-
-export function orderingKey(ordering: Ordering): OrderingKey {
-	let base = ordering.field;
-
-	if (typeof ordering.value === 'object') {
-		base += `.${orderingKey(ordering.value)}`;
-	}
-
-	return base;
-}
-
-export function createOrdering<TOrdering extends Ordering = Ordering>(
-	key: OrderingKey,
-	value: SortOrder
-): TOrdering {
-	return key
-		.split('.')
-		.reverse()
-		.reduce((acc, field, i) => {
-			if (i === 0)
-				return {
-					field,
-					value
-				};
-			else return { field, value: acc };
-		}, {} as any);
-}
-
-export function getOrderingDirection(ordering: Ordering): SortOrder {
-	if (typeof ordering.value === 'object') return getOrderingDirection(ordering.value);
-	else return ordering.value;
 }
 
 export const createDefaultExplorerSettings = <TOrder extends Ordering>(args?: {
@@ -79,6 +39,8 @@ export const createDefaultExplorerSettings = <TOrder extends Ordering>(args?: {
 		mediaAspectSquare: false as boolean,
 		mediaViewWithDescendants: true as boolean,
 		openOnDoubleClick: 'openFile' as DoubleClickAction,
+		listViewIconSize: DEFAULT_LIST_VIEW_ICON_SIZE as keyof typeof LIST_VIEW_ICON_SIZES,
+		listViewTextSize: DEFAULT_LIST_VIEW_TEXT_SIZE as keyof typeof LIST_VIEW_TEXT_SIZES,
 		colVisibility: {
 			name: true,
 			kind: true,
@@ -107,7 +69,7 @@ export const createDefaultExplorerSettings = <TOrder extends Ordering>(args?: {
 		}
 	}) satisfies ExplorerSettings<TOrder>;
 
-type CutCopyState =
+export type CutCopyState =
 	| {
 			type: 'Idle';
 	  }
@@ -123,44 +85,54 @@ type CutCopyState =
 			};
 	  };
 
+type DragState =
+	| {
+			type: 'touched';
+	  }
+	| {
+			type: 'dragging';
+			items: ExplorerItem[];
+			sourcePath?: string;
+			sourceLocationId?: number;
+			sourceTagId?: number;
+	  };
+
 const state = {
-	tagAssignMode: false,
 	showInspector: false,
 	showMoreInfo: false,
 	newLocationToRedirect: null as null | number,
 	mediaPlayerVolume: 0.7,
 	newThumbnails: proxySet() as Set<string>,
 	cutCopyState: { type: 'Idle' } as CutCopyState,
-	isDragging: false
+	drag: null as null | DragState,
+	isTagAssignModeActive: false,
+	isDragSelecting: false,
+	isRenaming: false,
+	// Used for disabling certain keyboard shortcuts when command palette is open
+	isCMDPOpen: false,
+	isContextMenuOpen: false,
+	quickRescanLastRun: Date.now() - 200,
+	// Map = { hotkey: '0'...'9', tagId: 1234 }
+	tagBulkAssignHotkeys: [] as Array<{ hotkey: string; tagId: number }>
 };
 
-export function flattenThumbnailKey(thumbKey: string[]) {
-	return thumbKey.join('/');
+export function flattenThumbnailKey(thumbKey: ThumbKey) {
+	return `${thumbKey.base_directory_str}/${thumbKey.shard_hex}/${thumbKey.cas_id}`;
 }
 
-// Keep the private and use `useExplorerState` or `getExplorerStore` or you will get production build issues.
-const explorerStore = proxy({
+export const explorerStore = proxy({
 	...state,
 	reset: (_state?: typeof state) => resetStore(explorerStore, _state || state),
-	addNewThumbnail: (thumbKey: string[]) => {
+	addNewThumbnail: (thumbKey: ThumbKey) => {
 		explorerStore.newThumbnails.add(flattenThumbnailKey(thumbKey));
 	},
-	// this should be done when the explorer query is refreshed
-	// prevents memory leak
-	resetNewThumbnails: () => {
+	resetCache: () => {
 		explorerStore.newThumbnails.clear();
+		// explorerStore.newFilePathsIdentified.clear();
 	}
 });
 
-export function useExplorerStore() {
-	return useSnapshot(explorerStore);
-}
-
-export function getExplorerStore() {
-	return explorerStore;
-}
-
-export function isCut(item: ExplorerItem, cutCopyState: ReadonlyDeep<CutCopyState>) {
+export function isCut(item: ExplorerItem, cutCopyState: CutCopyState) {
 	switch (item.type) {
 		case 'NonIndexedPath':
 			return (
@@ -182,24 +154,24 @@ export function isCut(item: ExplorerItem, cutCopyState: ReadonlyDeep<CutCopyStat
 }
 
 export const filePathOrderingKeysSchema = z.union([
-	z.literal('name').describe('Name'),
-	z.literal('sizeInBytes').describe('Size'),
-	z.literal('dateModified').describe('Date Modified'),
-	z.literal('dateIndexed').describe('Date Indexed'),
-	z.literal('dateCreated').describe('Date Created'),
-	z.literal('object.dateAccessed').describe('Date Accessed'),
-	z.literal('object.mediaData.epochTime').describe('Date Taken')
+	z.literal('name').describe(i18n.t('name')),
+	z.literal('sizeInBytes').describe(i18n.t('size')),
+	z.literal('dateModified').describe(i18n.t('date_modified')),
+	z.literal('dateIndexed').describe(i18n.t('date_indexed')),
+	z.literal('dateCreated').describe(i18n.t('date_created')),
+	z.literal('object.dateAccessed').describe(i18n.t('date_accessed')),
+	z.literal('object.mediaData.epochTime').describe(i18n.t('date_taken'))
 ]);
 
 export const objectOrderingKeysSchema = z.union([
-	z.literal('dateAccessed').describe('Date Accessed'),
-	z.literal('kind').describe('Kind'),
-	z.literal('mediaData.epochTime').describe('Date Taken')
+	z.literal('dateAccessed').describe(i18n.t('date_accessed')),
+	z.literal('kind').describe(i18n.t('kind')),
+	z.literal('mediaData.epochTime').describe(i18n.t('date_taken'))
 ]);
 
 export const nonIndexedPathOrderingSchema = z.union([
-	z.literal('name').describe('Name'),
-	// z.literal('sizeInBytes').describe('Size'),
-	z.literal('dateCreated').describe('Date Created'),
-	z.literal('dateModified').describe('Date Modified')
+	z.literal('name').describe(i18n.t('name')),
+	z.literal('sizeInBytes').describe(i18n.t('size')),
+	z.literal('dateCreated').describe(i18n.t('date_created')),
+	z.literal('dateModified').describe(i18n.t('date_modified'))
 ]);

@@ -128,12 +128,8 @@ pub async fn get_volumes() -> Vec<Volume> {
 
 			// Ensure disk has a valid device path
 			let real_path = match tokio::fs::canonicalize(disk_name).await {
-				Err(real_path) => {
-					error!(
-						"Failed to canonicalize disk path {}: {:#?}",
-						disk_name.to_string_lossy(),
-						real_path
-					);
+				Err(e) => {
+					error!(?disk_name, ?e, "Failed to canonicalize disk path;",);
 					continue;
 				}
 				Ok(real_path) => real_path,
@@ -216,6 +212,59 @@ pub async fn get_volumes() -> Vec<Volume> {
 	volumes
 }
 
+#[cfg(target_os = "ios")]
+pub async fn get_volumes() -> Vec<Volume> {
+	use std::os::unix::fs::MetadataExt;
+
+	use icrate::{
+		objc2::runtime::{Class, Object},
+		objc2::{msg_send, sel},
+		Foundation::{self, ns_string, NSFileManager, NSFileSystemSize, NSNumber, NSString},
+	};
+
+	let mut volumes: Vec<Volume> = Vec::new();
+
+	unsafe {
+		let file_manager = NSFileManager::defaultManager();
+
+		let root_dir = NSString::from_str("/");
+
+		let root_dir_ref = root_dir.as_ref();
+
+		let attributes = file_manager
+			.attributesOfFileSystemForPath_error(root_dir_ref)
+			.unwrap();
+
+		let attributes_ref = attributes.as_ref();
+
+		// Total space
+		let key = NSString::from_str("NSFileSystemSize");
+		let key_ref = key.as_ref();
+
+		let t = attributes_ref.get(key_ref).unwrap();
+		let total_space: u64 = msg_send![t, unsignedLongLongValue];
+
+		// Used space
+		let key = NSString::from_str("NSFileSystemFreeSize");
+		let key_ref = key.as_ref();
+
+		let t = attributes_ref.get(key_ref).unwrap();
+		let free_space: u64 = msg_send![t, unsignedLongLongValue];
+
+		volumes.push(Volume {
+			name: "Root".to_string(),
+			disk_type: DiskType::SSD,
+			file_system: Some("APFS".to_string()),
+			mount_points: vec![PathBuf::from("/")],
+			total_capacity: total_space,
+			available_capacity: free_space,
+			is_root_filesystem: true,
+		});
+	}
+
+	volumes
+}
+
 #[cfg(target_os = "macos")]
 #[derive(Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -237,7 +286,9 @@ struct HDIUtilInfo {
 	images: Vec<ImageInfo>,
 }
 
-#[cfg(not(target_os = "linux"))]
+// Android does not work via sysinfo and JNI is a pain to maintain. Therefore, we use React-Native-FS to get the volume data of the device.
+// We leave the function though to be built for Android because otherwise, the build will fail.
+#[cfg(not(any(target_os = "linux", target_os = "ios")))]
 pub async fn get_volumes() -> Vec<Volume> {
 	use futures::future;
 	use tokio::process::Command;
@@ -251,7 +302,7 @@ pub async fn get_volumes() -> Vec<Volume> {
 		.args(["info", "-plist"])
 		.output()
 		.await
-		.map_err(|err| error!("Failed to execute hdiutil: {err:#?}"))
+		.map_err(|e| error!(?e, "Failed to execute hdiutil;"))
 		.ok()
 		.and_then(|wmic_process| {
 			use std::str::FromStr;
@@ -259,8 +310,8 @@ pub async fn get_volumes() -> Vec<Volume> {
 			if wmic_process.status.success() {
 				let info: Result<HDIUtilInfo, _> = plist::from_bytes(&wmic_process.stdout);
 				match info {
-					Err(err) => {
-						error!("Failed to parse hdiutil output: {err:#?}");
+					Err(e) => {
+						error!(?e, "Failed to parse hdiutil output;");
 						None
 					}
 					Ok(info) => Some(
@@ -310,8 +361,14 @@ pub async fn get_volumes() -> Vec<Volume> {
 			}
 		}
 
-		#[allow(unused_mut)] // mut is used in windows
-		let mut total_capacity = disk.total_space();
+		#[cfg(windows)]
+		#[allow(clippy::needless_late_init)]
+		let mut total_capacity;
+		#[cfg(not(windows))]
+		#[allow(clippy::needless_late_init)]
+		let total_capacity;
+		total_capacity = disk.total_space();
+
 		let available_capacity = disk.available_space();
 		let is_root_filesystem = mount_point.is_absolute() && mount_point.parent().is_none();
 
@@ -335,7 +392,7 @@ pub async fn get_volumes() -> Vec<Volume> {
 					])
 					.output()
 					.await
-					.map_err(|err| error!("Failed to execute hdiutil: {err:#?}"))
+					.map_err(|e| error!(?e, "Failed to execute hdiutil;"))
 					.ok()
 					.and_then(|wmic_process| {
 						if wmic_process.status.success() {
@@ -352,7 +409,7 @@ pub async fn get_volumes() -> Vec<Volume> {
 						.trim()
 						.parse::<u64>()
 					{
-						Err(err) => error!("Failed to parse wmic output: {err:#?}"),
+						Err(e) => error!(?e, "Failed to parse wmic output;"),
 						Ok(n) => total_capacity = n,
 					}
 				}

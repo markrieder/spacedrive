@@ -14,7 +14,7 @@ import { useNavigate } from 'react-router';
 import { SystemLocations, useBridgeQuery } from '@sd/client';
 import { Button, Form, RadixCheckbox } from '@sd/ui';
 import { Icon, TruncatedText } from '~/components';
-import { useIsDark, useOperatingSystem } from '~/hooks';
+import { useIsDark, useLocale, useOperatingSystem } from '~/hooks';
 
 import { OnboardingContainer, OnboardingDescription, OnboardingTitle } from './components';
 import { useOnboardingContext } from './context';
@@ -36,7 +36,7 @@ const LocationIcon = (props: { location: SystemLocation; active?: boolean }) => 
 	const LocationIcon = icons[props.location];
 
 	return (
-		<div className="absolute -bottom-9 -right-9 h-28 w-28">
+		<div className="absolute -bottom-9 -right-9 size-28">
 			<Icon name="Folder" />
 			<LocationIcon
 				weight="fill"
@@ -54,6 +54,8 @@ const LocationIcon = (props: { location: SystemLocation; active?: boolean }) => 
 };
 
 export default function OnboardingLocations() {
+	const { t } = useLocale();
+
 	const navigate = useNavigate();
 	const os = useOperatingSystem(true);
 
@@ -67,6 +69,7 @@ export default function OnboardingLocations() {
 			}),
 			{} as Record<SystemLocation, string>
 		);
+
 		return Object.keys(locations).length > 0 ? locations : null;
 	}, [data]);
 
@@ -90,11 +93,21 @@ export default function OnboardingLocations() {
 			className="flex flex-col items-center"
 		>
 			<OnboardingContainer>
-				<OnboardingTitle>Add Locations</OnboardingTitle>
-				<OnboardingDescription>
-					Enhance your Spacedrive experience by adding your favorite locations to your
-					personal library, for seamless and efficient file management.
-				</OnboardingDescription>
+				<div className="flex items-center">
+					<Icon
+						name="Folder"
+						size={40}
+						className="relative right-[-26px] z-0 brightness-[0.5]"
+					/>
+					<Icon name="Folder" size={60} className="relative z-[5] brightness-[0.8]" />
+					<Icon
+						name="Folder"
+						size={46}
+						className="relative left-[-25px] z-0 brightness-[0.6]"
+					/>
+				</div>
+				<OnboardingTitle>{t('add_locations')}</OnboardingTitle>
+				<OnboardingDescription>{t('add_location_description')}</OnboardingDescription>
 
 				{systemLocations && (
 					<div className="my-6">
@@ -102,7 +115,7 @@ export default function OnboardingLocations() {
 							name="toggle-all"
 							className="mb-1.5 justify-end"
 							labelClassName="!ml-1.5"
-							label="Toggle All"
+							label={t('toggle_all')}
 							checked={toggled}
 							onCheckedChange={(value) => {
 								if (typeof value !== 'boolean') return;
@@ -119,7 +132,10 @@ export default function OnboardingLocations() {
 							}}
 						/>
 
-						<div className="grid grid-cols-2 gap-2">
+						<div
+							className="grid grid-cols-2 gap-2"
+							data-locations={JSON.stringify(systemLocations)}
+						>
 							{(Object.keys(systemLocations) as SystemLocation[]).map((location) => (
 								<Controller
 									key={location}
@@ -166,7 +182,7 @@ export default function OnboardingLocations() {
 				)}
 
 				<Button type="submit" className="text-center" variant="accent" size="sm">
-					Continue
+					{t('continue')}
 				</Button>
 			</OnboardingContainer>
 		</Form>

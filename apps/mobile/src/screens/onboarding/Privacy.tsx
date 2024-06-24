@@ -1,11 +1,12 @@
+import * as Haptics from 'expo-haptics';
+import { ArrowRight } from 'phosphor-react-native';
 import React from 'react';
 import { Controller } from 'react-hook-form';
-import { Pressable, Text, View, ViewStyle } from 'react-native';
+import { Linking, Pressable, Text, View, ViewStyle } from 'react-native';
+import { useOnboardingContext } from '~/components/context/OnboardingContext';
 import { Button } from '~/components/primitive/Button';
 import { tw, twStyle } from '~/lib/tailwind';
-import { OnboardingStackScreenProps } from '~/navigation/OnboardingNavigator';
 
-import { useOnboardingContext } from './context';
 import { OnboardingContainer, OnboardingDescription, OnboardingTitle } from './GetStarted';
 
 type RadioButtonProps = {
@@ -80,9 +81,28 @@ const PrivacyScreen = () => {
 					)}
 				/>
 			</View>
-			<Button variant="accent" size="sm" onPress={form.handleSubmit(submit)} style={tw`mt-6`}>
+			<Button
+				variant="accent"
+				size="sm"
+				onPress={() => {
+					Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+					form.handleSubmit(submit)();
+				}}
+				style={tw`mt-6`}
+			>
 				<Text style={tw`text-center text-base font-medium text-ink`}>Continue</Text>
 			</Button>
+			<Pressable
+				onPress={() => {
+					Linking.openURL('https://www.spacedrive.com/docs/product/resources/privacy');
+				}}
+				style={tw`mt-6 flex flex-row items-center justify-center`}
+			>
+				<ArrowRight size={16} style={tw`mr-0.5`} color={tw.color('text-ink-faint')} />
+				<Text style={tw`text-center text-sm font-medium text-ink-faint underline`}>
+					Learn more about the data we collect
+				</Text>
+			</Pressable>
 		</OnboardingContainer>
 	);
 };

@@ -1,7 +1,10 @@
 use futures::{future::join_all, StreamExt};
 use futures_channel::mpsc;
 use once_cell::sync::{Lazy, OnceCell};
-use rspc::internal::jsonrpc::{self, *};
+use rspc::internal::jsonrpc::{
+	self, handle_json_rpc, OwnedMpscSender, Request, RequestId, Response, Sender,
+	SubscriptionUpgrade,
+};
 use sd_core::{api::Router, Node};
 use serde_json::{from_str, from_value, to_string, Value};
 use std::{
@@ -71,16 +74,15 @@ pub fn handle_core_msg(
 				None => {
 					let _guard = Node::init_logger(&data_dir);
 
-					// TODO: probably don't unwrap
-					let new_node = Node::new(
-						data_dir,
-						sd_core::Env {
-							api_url: "https://app.spacedrive.com".to_string(),
-							client_id: CLIENT_ID.to_string(),
-						},
-					)
-					.await
-					.unwrap();
+					let new_node = match Node::new(data_dir, sd_core::Env::new(CLIENT_ID)).await {
+						Ok(node) => node,
+						Err(e) => {
+							error!(?e, "Failed to initialize node;");
+							callback(Err(query));
+							return;
+						}
+					};
+
 					node.replace(new_node.clone());
 					new_node
 				}
@@ -92,8 +94,8 @@ pub fn handle_core_msg(
 			false => from_value::<Request>(v).map(|v| vec![v]),
 		}) {
 			Ok(v) => v,
-			Err(err) => {
-				error!("failed to decode JSON-RPC request: {}", err); // Don't use tracing here because it's before the `Node` is initialised which sets that config!
+			Err(e) => {
+				error!(?e, "Failed to decode JSON-RPC request;");
 				callback(Err(query));
 				return;
 			}
@@ -131,8 +133,8 @@ pub fn spawn_core_event_listener(callback: impl Fn(String) + Send + 'static) {
 		while let Some(event) = rx.next().await {
 			let data = match to_string(&event) {
 				Ok(json) => json,
-				Err(err) => {
-					error!("Failed to serialize event: {err}");
+				Err(e) => {
+					error!(?e, "Failed to serialize event;");
 					continue;
 				}
 			};

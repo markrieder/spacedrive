@@ -1,41 +1,60 @@
 import clsx from 'clsx';
-import { useMemo, useRef } from 'react';
+import { useCallback, useRef } from 'react';
 import {
 	getEphemeralPath,
 	getExplorerItemData,
 	getIndexedItemFilePath,
 	useLibraryMutation,
 	useRspcLibraryContext,
+	useSelector,
 	type ExplorerItem
 } from '@sd/client';
 import { toast } from '@sd/ui';
-import { useIsDark } from '~/hooks';
+import { useIsDark, useLocale } from '~/hooks';
 
 import { useExplorerContext } from '../Context';
-import { RenameTextBox } from '../FilePath/RenameTextBox';
+import { RenameTextBox, RenameTextBoxProps } from '../FilePath/RenameTextBox';
 import { useQuickPreviewStore } from '../QuickPreview/store';
+import { explorerStore } from '../store';
 
-interface Props {
+type TextBoxProps = Pick<
+	RenameTextBoxProps,
+	'toggleBy' | 'lines' | 'editLines' | 'className' | 'idleClassName' | 'activeClassName' | 'style'
+>;
+
+interface Props extends TextBoxProps {
 	item: ExplorerItem;
+	selected?: boolean;
+	highlight?: boolean;
 	allowHighlight?: boolean;
-	style?: React.CSSProperties;
-	lines?: number;
 }
 
-export const RenamableItemText = ({ item, allowHighlight = true, style, lines }: Props) => {
-	const rspc = useRspcLibraryContext();
-	const explorer = useExplorerContext();
-	const quickPreviewStore = useQuickPreviewStore();
+const RENAMABLE_ITEM_TYPES: Partial<Record<ExplorerItem['type'], boolean>> = {
+	Location: true,
+	Path: true,
+	NonIndexedPath: true,
+	Object: true
+};
+
+export const RenamableItemText = ({
+	item,
+	selected,
+	highlight,
+	className,
+	allowHighlight = true,
+	...props
+}: Props) => {
 	const isDark = useIsDark();
+	const rspc = useRspcLibraryContext();
+
+	const explorer = useExplorerContext({ suspense: false });
+	const isDragging = useSelector(explorerStore, (s) => s.drag?.type === 'dragging');
+
+	const quickPreviewStore = useQuickPreviewStore();
 
 	const itemData = getExplorerItemData(item);
 
 	const ref = useRef<HTMLDivElement>(null);
-
-	const selected = useMemo(
-		() => explorer.selectedItems.has(item),
-		[explorer.selectedItems, item]
-	);
 
 	const renameFile = useLibraryMutation(['files.renameFile'], {
 		onError: () => reset(),
@@ -52,88 +71,98 @@ export const RenamableItemText = ({ item, allowHighlight = true, style, lines }:
 		onSuccess: () => rspc.queryClient.invalidateQueries(['search.paths'])
 	});
 
-	const reset = () => {
+	const reset = useCallback(() => {
 		if (!ref.current || !itemData.fullName) return;
 		ref.current.innerText = itemData.fullName;
-	};
+	}, [itemData.fullName]);
 
-	const handleRename = async (newName: string) => {
-		try {
-			switch (item.type) {
-				case 'Location': {
-					const locationId = item.item.id;
-					if (!locationId) throw new Error('Missing location id');
+	const { t } = useLocale();
 
-					await renameLocation.mutateAsync({
-						id: locationId,
-						path: null,
-						name: newName,
-						generate_preview_media: null,
-						sync_preview_media: null,
-						hidden: null,
-						indexer_rules_ids: []
-					});
+	const handleRename = useCallback(
+		async (newName: string) => {
+			try {
+				switch (item.type) {
+					case 'Location': {
+						const locationId = item.item.id;
+						if (!locationId) throw new Error('Missing location id');
 
-					break;
-				}
+						await renameLocation.mutateAsync({
+							id: locationId,
+							path: null,
+							name: newName,
+							generate_preview_media: null,
+							sync_preview_media: null,
+							hidden: null,
+							indexer_rules_ids: []
+						});
 
-				case 'Path':
-				case 'Object': {
-					const filePathData = getIndexedItemFilePath(item);
+						break;
+					}
 
-					if (!filePathData) throw new Error('Failed to get file path object');
+					case 'Path':
+					case 'Object': {
+						const filePathData = getIndexedItemFilePath(item);
 
-					const { id, location_id } = filePathData;
+						if (!filePathData) throw new Error('Failed to get file path object');
 
-					if (!location_id) throw new Error('Missing location id');
+						const { id, location_id } = filePathData;
 
-					await renameFile.mutateAsync({
-						location_id: location_id,
-						kind: {
-							One: {
-								from_file_path_id: id,
-								to: newName
+						if (!location_id) throw new Error('Missing location id');
+
+						await renameFile.mutateAsync({
+							location_id: location_id,
+							kind: {
+								One: {
+									from_file_path_id: id,
+									to: newName
+								}
 							}
-						}
-					});
+						});
 
-					break;
-				}
+						break;
+					}
 
-				case 'NonIndexedPath': {
-					const ephemeralFile = getEphemeralPath(item);
+					case 'NonIndexedPath': {
+						const ephemeralFile = getEphemeralPath(item);
 
-					if (!ephemeralFile) throw new Error('Failed to get ephemeral file object');
+						if (!ephemeralFile) throw new Error('Failed to get ephemeral file object');
 
-					renameEphemeralFile.mutate({
-						kind: {
-							One: {
-								from_path: ephemeralFile.path,
-								to: newName
+						renameEphemeralFile.mutate({
+							kind: {
+								One: {
+									from_path: ephemeralFile.path,
+									to: newName
+								}
 							}
-						}
-					});
+						});
 
-					break;
+						break;
+					}
+
+					default:
+						throw new Error('Invalid explorer item type');
 				}
-
-				default:
-					throw new Error('Invalid explorer item type');
+			} catch (e) {
+				reset();
+				toast.error({
+					title: t('failed_to_rename_file', {
+						oldName: itemData.fullName,
+						newName
+					}),
+					body: t('error_message', { error: e })
+				});
 			}
-		} catch (e) {
-			reset();
-			toast.error({
-				title: `Could not rename ${itemData.fullName} to ${newName}`,
-				body: `Error: ${e}.`
-			});
-		}
-	};
+		},
+		[itemData.fullName, item, renameEphemeralFile, renameFile, renameLocation, reset, t]
+	);
 
 	const disabled =
 		!selected ||
+		isDragging ||
+		!explorer ||
 		explorer.selectedItems.size > 1 ||
 		quickPreviewStore.open ||
-		item.type === 'SpacedropPeer';
+		!RENAMABLE_ITEM_TYPES[item.type];
 
 	return (
 		<RenameTextBox
@@ -141,11 +170,11 @@ export const RenamableItemText = ({ item, allowHighlight = true, style, lines }:
 			disabled={disabled}
 			onRename={handleRename}
 			className={clsx(
-				'text-center font-medium',
-				selected && allowHighlight && ['bg-accent', !isDark && 'text-white']
+				'font-medium',
+				className,
+				(selected || highlight) && allowHighlight && ['bg-accent', !isDark && 'text-white']
 			)}
-			style={style}
-			lines={lines}
+			{...props}
 		/>
 	);
 };

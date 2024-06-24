@@ -1,6 +1,6 @@
 import clsx from 'clsx';
 import { Suspense, useEffect, useMemo, useRef } from 'react';
-import { Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Navigate, Outlet, useNavigate } from 'react-router-dom';
 import {
 	ClientContextProvider,
 	initPlausible,
@@ -13,6 +13,7 @@ import {
 } from '@sd/client';
 import { useRootContext } from '~/app/RootContext';
 import { LibraryIdParamsSchema } from '~/app/route-schemas';
+import ErrorFallback, { BetterErrorBoundary } from '~/ErrorFallback';
 import {
 	useKeybindEventHandler,
 	useOperatingSystem,
@@ -23,11 +24,16 @@ import {
 } from '~/hooks';
 import { usePlatform } from '~/util/Platform';
 
+import { DragOverlay } from '../Explorer/DragOverlay';
 import { QuickPreviewContextProvider } from '../Explorer/QuickPreview/Context';
+import CMDK from './CMDK';
 import { LayoutContext } from './Context';
+import { DndContext } from './DndContext';
 import Sidebar from './Sidebar';
 
 const Layout = () => {
+	useRedirectToNewLocation();
+
 	const { libraries, library } = useClientContext();
 	const os = useOperatingSystem();
 	const showControls = useShowControls();
@@ -36,8 +42,6 @@ const Layout = () => {
 	useKeybindEventHandler(library?.uuid);
 
 	const layoutRef = useRef<HTMLDivElement>(null);
-
-	useRedirectToNewLocation();
 
 	const ctxValue = useMemo(() => ({ ref: layoutRef }), [layoutRef]);
 
@@ -57,7 +61,7 @@ const Layout = () => {
 				ref={layoutRef}
 				className={clsx(
 					// App level styles
-					'flex h-screen cursor-default select-none overflow-hidden text-ink',
+					'flex h-screen select-none overflow-hidden text-ink',
 					os === 'macOS' && [
 						'has-blur-effects',
 						!windowState.isFullScreen &&
@@ -69,27 +73,35 @@ const Layout = () => {
 					e.preventDefault();
 				}}
 			>
-				<Sidebar />
-				<div
-					className={clsx(
-						'relative flex w-full overflow-hidden',
-						showControls.transparentBg ? 'bg-app/80' : 'bg-app'
-					)}
-				>
-					{library ? (
-						<QuickPreviewContextProvider>
-							<LibraryContextProvider library={library}>
-								<Suspense fallback={<div className="h-screen w-screen bg-app" />}>
-									<Outlet />
-								</Suspense>
-							</LibraryContextProvider>
-						</QuickPreviewContextProvider>
-					) : (
-						<h1 className="p-4 text-white">
-							Please select or create a library in the sidebar.
-						</h1>
-					)}
-				</div>
+				<DndContext>
+					<Sidebar />
+					<div
+						className={clsx(
+							'relative flex w-full overflow-hidden',
+							showControls.transparentBg ? 'bg-app/80' : 'bg-app'
+						)}
+					>
+						<BetterErrorBoundary FallbackComponent={ErrorFallback}>
+							{library ? (
+								<QuickPreviewContextProvider>
+									<LibraryContextProvider library={library}>
+										<Suspense
+											fallback={<div className="h-screen w-screen bg-app" />}
+										>
+											<Outlet />
+											<CMDK />
+											<DragOverlay />
+										</Suspense>
+									</LibraryContextProvider>
+								</QuickPreviewContextProvider>
+							) : (
+								<h1 className="p-4 text-white">
+									Please select or create a library in the sidebar.
+								</h1>
+							)}
+						</BetterErrorBoundary>
+					</div>
+				</DndContext>
 			</div>
 		</LayoutContext.Provider>
 	);
@@ -122,15 +134,9 @@ function useUpdater() {
 }
 
 function usePlausible() {
-	const { platform } = usePlatform();
-	const buildInfo = useBridgeQuery(['buildInfo']);
-
-	initPlausible({
-		platformType: platform === 'tauri' ? 'desktop' : 'web',
-		buildInfo: buildInfo?.data
-	});
-
 	const { rawPath } = useRootContext();
+	const { platform } = usePlatform();
+	const { data: buildInfo } = useBridgeQuery(['buildInfo']) ?? {};
 
 	usePlausiblePageViewMonitor({ currentPath: rawPath });
 	usePlausiblePingMonitor({ currentPath: rawPath });
@@ -138,12 +144,15 @@ function usePlausible() {
 	const plausibleEvent = usePlausibleEvent();
 
 	useEffect(() => {
+		initPlausible({
+			buildInfo,
+			platformType: platform === 'tauri' ? 'desktop' : 'web'
+		});
+	}, [platform, buildInfo]);
+
+	useEffect(() => {
 		const interval = setInterval(() => {
-			plausibleEvent({
-				event: {
-					type: 'ping'
-				}
-			});
+			plausibleEvent({ event: { type: 'ping' } });
 		}, 270 * 1000);
 
 		return () => clearInterval(interval);

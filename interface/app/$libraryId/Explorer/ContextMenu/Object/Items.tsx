@@ -3,6 +3,7 @@ import { useMemo } from 'react';
 import { ExplorerItem, ObjectKind, useLibraryMutation, type ObjectKindEnum } from '@sd/client';
 import { ContextMenu, dialogManager, toast } from '@sd/ui';
 import { Menu } from '~/components/Menu';
+import { useLocale } from '~/hooks';
 import { isNonEmpty } from '~/util';
 
 import ImageDialog from '../../Dialogs/ImageDialog';
@@ -22,9 +23,11 @@ export const RemoveFromRecents = new ConditionalItem({
 	Component: ({ selectedObjects }) => {
 		const removeFromRecents = useLibraryMutation('files.removeAccessTime');
 
+		const { t } = useLocale();
+
 		return (
 			<ContextMenu.Item
-				label="Remove From Recents"
+				label={t('remove_from_recents')}
 				onClick={async () => {
 					try {
 						await removeFromRecents.mutateAsync(
@@ -32,8 +35,8 @@ export const RemoveFromRecents = new ConditionalItem({
 						);
 					} catch (error) {
 						toast.error({
-							title: `Failed to remove file from recents`,
-							body: `Error: ${error}.`
+							title: t('failed_to_remove_file_from_recents'),
+							body: t('error_message', { error })
 						});
 					}
 				}}
@@ -59,11 +62,14 @@ export const AssignTag = new ConditionalItem({
 
 		return { items };
 	},
-	Component: ({ items }) => (
-		<Menu.SubMenu label="Assign tag" icon={TagSimple}>
-			<AssignTagMenuItems items={items} />
-		</Menu.SubMenu>
-	)
+	Component: ({ items }) => {
+		const { t } = useLocale();
+		return (
+			<Menu.SubMenu label={t('assign_tag')} icon={TagSimple}>
+				<AssignTagMenuItems items={items} />
+			</Menu.SubMenu>
+		);
+	}
 });
 
 const ObjectConversions: Record<number, string[]> = {
@@ -94,15 +100,22 @@ export const ConvertObject = new ConditionalItem({
 
 		return { kind, selectedObjects, selectedItems };
 	},
-	Component: ({ selectedItems }) => (
-		<Menu.Item
-			onClick={() => {
-				dialogManager.create((dp) => (
-					<ImageDialog selectedItem={selectedItems[0]} {...dp} />
-				));
-			}}
-			label="Convert image"
-			icon={ArrowBendUpRight}
-		/>
-	)
+	Component: ({ kind }) => {
+		const { t } = useLocale();
+		return (
+			<Menu.SubMenu
+			label={t('convert_to')} icon={ArrowBendUpRight}>
+				{ObjectConversions[kind]?.map((ext) => (
+					<Menu.Item
+					onClick={() => {
+						dialogManager.create((dp) => (
+							<ImageDialog selectedItem={selectedItems[0]} {...dp} />
+						));
+					}}
+					key={ext} label={ext}
+					 disabled />
+				))}
+			</Menu.SubMenu>
+		);
+	}
 });

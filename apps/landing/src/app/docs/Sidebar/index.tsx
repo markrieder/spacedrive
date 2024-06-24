@@ -46,15 +46,19 @@ export async function Sidebar() {
 				{navigationWithReleases.map((section) => {
 					const Icon = iconConfig[section.slug];
 
+					const href = section.categories[0]?.docs[0]?.url;
+
+					if (!href) return null;
+
 					return (
 						<SectionLink
 							// Use the first page in the section as the link
-							href={section.categories[0].docs[0].url}
+							href={href}
 							key={section.slug}
 							slug={section.slug}
 						>
 							<div className="mr-4 rounded-lg border-t border-gray-400/20 bg-gray-500 p-1">
-								<Icon weight="bold" className="h-4 w-4 text-white opacity-80" />
+								<Icon weight="bold" className="size-4 text-white opacity-80" />
 							</div>
 							{toTitleCase(section.slug)}
 						</SectionLink>

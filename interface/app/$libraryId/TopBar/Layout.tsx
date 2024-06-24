@@ -1,47 +1,24 @@
-import { createContext, useContext, useState } from 'react';
+import { useEffect } from 'react';
 import { Outlet } from 'react-router';
-import { SearchFilterArgs } from '@sd/client';
 
 import TopBar from '.';
-import { SearchContextProvider } from '../Explorer/Search/Context';
-
-const TopBarContext = createContext<ReturnType<typeof useContextValue> | null>(null);
-
-function useContextValue() {
-	const [left, setLeft] = useState<HTMLDivElement | null>(null);
-	const [right, setRight] = useState<HTMLDivElement | null>(null);
-	const [fixedArgs, setFixedArgs] = useState<SearchFilterArgs[] | null>(null);
-	const [topBarHeight, setTopBarHeight] = useState(0);
-
-	return {
-		left,
-		setLeft,
-		right,
-		setRight,
-		fixedArgs,
-		setFixedArgs,
-		topBarHeight,
-		setTopBarHeight
-	};
-}
+import { explorerStore } from '../Explorer/store';
+import { TopBarContext, useContextValue } from './Context';
 
 export const Component = () => {
 	const value = useContextValue();
 
+	// Reset drag state
+	useEffect(() => {
+		return () => {
+			explorerStore.drag = null;
+		};
+	}, []);
+
 	return (
 		<TopBarContext.Provider value={value}>
-			<SearchContextProvider>
-				<TopBar />
-				<Outlet />
-			</SearchContextProvider>
+			<TopBar />
+			<Outlet />
 		</TopBarContext.Provider>
 	);
 };
-
-export function useTopBarContext() {
-	const ctx = useContext(TopBarContext);
-
-	if (!ctx) throw new Error('TopBarContext not found!');
-
-	return ctx;
-}

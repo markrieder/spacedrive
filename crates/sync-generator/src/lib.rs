@@ -17,7 +17,6 @@ enum Error {}
 #[derive(serde::Deserialize)]
 struct SDSyncGenerator {}
 
-#[allow(unused)]
 #[derive(Clone)]
 pub enum ModelSyncType<'a> {
 	Local {
@@ -28,10 +27,13 @@ pub enum ModelSyncType<'a> {
 	// },
 	Shared {
 		id: FieldWalker<'a>,
+		// model ids help reduce storage cost of sync messages
+		model_id: u16,
 	},
 	Relation {
 		group: RelationFieldWalker<'a>,
 		item: RelationFieldWalker<'a>,
+		model_id: u16,
 	},
 }
 
@@ -49,7 +51,13 @@ impl<'a> ModelSyncType<'a> {
 
 				match attr.name {
 					"local" => Self::Local { id },
-					"shared" => Self::Shared { id },
+					"shared" => Self::Shared {
+						id,
+						model_id: attr
+							.field("modelId")
+							.and_then(|a| a.as_single())
+							.and_then(|s| s.parse().ok())?,
+					},
 					_ => return None,
 				}
 			}
@@ -77,9 +85,12 @@ impl<'a> ModelSyncType<'a> {
 				Self::Relation {
 					item: get_field("item"),
 					group: get_field("group"),
+					model_id: attr
+						.field("modelId")
+						.and_then(|a| a.as_single())
+						.and_then(|s| s.parse().ok())?,
 				}
 			}
-
 			// "owned" => Self::Owned { id },
 			_ => return None,
 		})
@@ -88,9 +99,9 @@ impl<'a> ModelSyncType<'a> {
 	fn sync_id(&self) -> Vec<FieldWalker> {
 		match self {
 			// Self::Owned { id } => id.clone(),
-			Self::Local { id } => vec![*id],
-			Self::Shared { id } => vec![*id],
-			Self::Relation { group, item } => vec![(*group).into(), (*item).into()],
+			Self::Local { id, .. } => vec![*id],
+			Self::Shared { id, .. } => vec![*id],
+			Self::Relation { group, item, .. } => vec![(*group).into(), (*item).into()],
 		}
 	}
 }

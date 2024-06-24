@@ -1,6 +1,6 @@
 import { ContextType, createContext, PropsWithChildren, useContext } from 'react';
+import { type Ordering } from '@sd/client';
 
-import { Ordering } from './store';
 import { UseExplorer } from './useExplorer';
 
 /**
@@ -26,4 +26,4 @@ export const ExplorerContextProvider = <TExplorer extends UseExplorer<any>>({
 	children
 }: PropsWithChildren<{
 	explorer: TExplorer;
-}>) => <ExplorerContext.Provider value={explorer as any}>{children}</ExplorerContext.Provider>;
+}>) => <ExplorerContext.Provider value={explorer}>{children}</ExplorerContext.Provider>;

@@ -1,7 +1,8 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { LibraryConfigWrapped, useBridgeMutation, usePlausibleEvent, useZodForm } from '@sd/client';
+import { insertLibrary, useBridgeMutation, usePlausibleEvent, useZodForm } from '@sd/client';
 import { Dialog, InputField, useDialog, UseDialogProps, z } from '@sd/ui';
+import { useLocale } from '~/hooks';
 import { usePlatform } from '~/util/Platform';
 
 const schema = z.object({
@@ -15,6 +16,8 @@ const schema = z.object({
 });
 
 export default (props: UseDialogProps) => {
+	const { t } = useLocale();
+
 	const navigate = useNavigate();
 	const queryClient = useQueryClient();
 	const submitPlausibleEvent = usePlausibleEvent();
@@ -31,16 +34,13 @@ export default (props: UseDialogProps) => {
 				default_locations: null
 			});
 
-			queryClient.setQueryData<LibraryConfigWrapped[]>(['library.list'], (libraries) => [
-				...(libraries || []),
-				library
-			]);
+			insertLibrary(queryClient, library);
 
 			submitPlausibleEvent({
 				event: { type: 'libraryCreate' }
 			});
 
-			platform.refreshMenuBar && platform.refreshMenuBar();
+			platform.refreshMenuBar?.();
 
 			navigate(`/${library.uuid}`);
 		} catch (e) {
@@ -54,14 +54,16 @@ export default (props: UseDialogProps) => {
 			onSubmit={onSubmit}
 			dialog={useDialog(props)}
 			submitDisabled={!form.formState.isValid}
-			title="Create New Library"
-			description="Libraries are a secure, on-device database. Your files remain where they are, the Library catalogs them and stores all Spacedrive related data."
-			ctaLabel={form.formState.isSubmitting ? 'Creating library...' : 'Create library'}
+			title={t('create_new_library')}
+			closeLabel={t('close')}
+			cancelLabel={t('cancel')}
+			description={t('create_new_library_description')}
+			ctaLabel={form.formState.isSubmitting ? t('creating_library') : t('create_library')}
 		>
 			<div className="mt-5 space-y-4">
 				<InputField
 					{...form.register('name')}
-					label="Library name"
+					label={t('library_name')}
 					placeholder={'e.g. "James\' Library"'}
 					size="md"
 				/>

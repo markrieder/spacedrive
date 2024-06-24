@@ -1,26 +1,29 @@
 import { createMemoryHistory } from '@remix-run/router';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { listen } from '@tauri-apps/api/event';
-import { appWindow } from '@tauri-apps/api/window';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { PropsWithChildren, startTransition, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { RspcProvider } from '@sd/client';
 import {
+	createRoutes,
 	ErrorPage,
 	KeybindEvent,
 	PlatformProvider,
-	routes,
-	SpacedriveInterface,
+	SpacedriveInterfaceRoot,
+	SpacedriveRouterProvider,
 	TabsContext
 } from '@sd/interface';
 import { RouteTitleContext } from '@sd/interface/hooks/useRouteTitle';
-import { getSpacedropState } from '@sd/interface/hooks/useSpacedropState';
 
 import '@sd/ui/style/style.scss';
 
-import * as commands from './commands';
+import { useLocale } from '@sd/interface/hooks';
+
+import { commands } from './commands';
 import { platform } from './platform';
 import { queryClient } from './query';
 import { createMemoryRouterWithHistory } from './router';
+import { createUpdater } from './updater';
 
 // TODO: Bring this back once upstream is fixed up.
 // const client = hooks.createClient({
@@ -45,32 +48,23 @@ export default function App() {
 			document.dispatchEvent(new KeybindEvent(input.payload as string));
 		});
 
-		const dropEventListener = appWindow.onFileDropEvent((event) => {
-			if (event.payload.type === 'drop') {
-				getSpacedropState().droppedFiles = event.payload.paths;
-			}
-		});
-
 		return () => {
 			keybindListener.then((unlisten) => unlisten());
-			dropEventListener.then((unlisten) => unlisten());
 		};
 	}, []);
 
 	return (
 		<RspcProvider queryClient={queryClient}>
-			<PlatformProvider platform={platform}>
-				<QueryClientProvider client={queryClient}>
-					{startupError ? (
-						<ErrorPage
-							message={startupError}
-							submessage="Error occurred starting up the Spacedrive core"
-						/>
-					) : (
-						<AppInner />
-					)}
-				</QueryClientProvider>
-			</PlatformProvider>
+			<QueryClientProvider client={queryClient}>
+				{startupError ? (
+					<ErrorPage
+						message={startupError}
+						submessage="Error occurred starting up the Spacedrive core"
+					/>
+				) : (
+					<AppInner />
+				)}
+			</QueryClientProvider>
 		</RspcProvider>
 	);
 }
@@ -78,14 +72,36 @@ export default function App() {
 // we have a minimum delay between creating new tabs as react router can't handle creating tabs super fast
 const TAB_CREATE_DELAY = 150;
 
+const routes = createRoutes(platform);
+
+type redirect = { pathname: string; search: string | undefined };
+
 function AppInner() {
-	function createTab() {
+	const [tabs, setTabs] = useState(() => [createTab()]);
+	const [selectedTabIndex, setSelectedTabIndex] = useState(0);
+
+	const selectedTab = tabs[selectedTabIndex]!;
+
+	function createTab(redirect?: redirect) {
 		const history = createMemoryHistory();
 		const router = createMemoryRouterWithHistory({ routes, history });
 
+		const id = Math.random().toString();
+
+		// for "Open in new tab"
+		if (redirect) {
+			router.navigate({
+				pathname: redirect.pathname,
+				search: redirect.search
+			});
+		}
+
 		const dispose = router.subscribe((event) => {
+			// we don't care about non-idle events as those are artifacts of form mutations + suspense
+			if (event.navigation.state !== 'idle') return;
+
 			setTabs((routers) => {
-				const index = routers.findIndex((r) => r.router === router);
+				const index = routers.findIndex((r) => r.id === id);
 				if (index === -1) return routers;
 
 				const routerAtIndex = routers[index]!;
@@ -104,56 +120,70 @@ function AppInner() {
 		});
 
 		return {
+			id,
 			router,
 			history,
 			dispose,
+			element: document.createElement('div'),
 			currentIndex: 0,
 			maxIndex: 0,
 			title: 'New Tab'
 		};
 	}
 
-	const [tabs, setTabs] = useState(() => [createTab()]);
-	const [tabIndex, setTabIndex] = useState(0);
-
-	const tab = tabs[tabIndex]!;
-
 	const createTabPromise = useRef(Promise.resolve());
+
+	const ref = useRef<HTMLDivElement>(null);
+
+	useEffect(() => {
+		const div = ref.current;
+		if (!div) return;
+
+		div.appendChild(selectedTab.element);
+
+		return () => {
+			while (div.firstChild) {
+				div.removeChild(div.firstChild);
+			}
+		};
+	}, [selectedTab.element]);
 
 	return (
 		<RouteTitleContext.Provider
 			value={useMemo(
 				() => ({
-					setTitle(title) {
-						setTabs((oldTabs) => {
-							const tabs = [...oldTabs];
-							const tab = tabs[tabIndex];
-							if (!tab) return tabs;
+					setTitle(id, title) {
+						setTabs((tabs) => {
+							const tabIndex = tabs.findIndex((t) => t.id === id);
+							if (tabIndex === -1) return tabs;
 
-							tabs[tabIndex] = { ...tab, title };
+							tabs[tabIndex] = { ...tabs[tabIndex]!, title };
 
-							return tabs;
+							return [...tabs];
 						});
 					}
 				}),
-				[tabIndex]
+				[]
 			)}
 		>
 			<TabsContext.Provider
 				value={{
-					tabIndex,
-					setTabIndex,
+					tabIndex: selectedTabIndex,
+					setTabIndex: setSelectedTabIndex,
 					tabs: tabs.map(({ router, title }) => ({ router, title })),
-					createTab() {
+					createTab(redirect?: redirect) {
 						createTabPromise.current = createTabPromise.current.then(
 							() =>
 								new Promise((res) => {
-									setTabs((tabs) => {
-										const newTabs = [...tabs, createTab()];
+									startTransition(() => {
+										setTabs((tabs) => {
+											const newTab = createTab(redirect);
+											const newTabs = [...tabs, newTab];
 
-										setTabIndex(newTabs.length - 1);
+											setSelectedTabIndex(newTabs.length - 1);
 
-										return newTabs;
+											return newTabs;
+										});
 									});
 
 									setTimeout(res, TAB_CREATE_DELAY);
@@ -161,30 +191,63 @@ function AppInner() {
 						);
 					},
 					removeTab(index: number) {
-						setTabs((tabs) => {
-							const tab = tabs[index];
-							if (!tab) return tabs;
+						startTransition(() => {
+							setTabs((tabs) => {
+								const tab = tabs[index];
+								if (!tab) return tabs;
 
-							tab.dispose();
+								tab.dispose();
 
-							tabs.splice(index, 1);
+								tabs.splice(index, 1);
 
-							setTabIndex(tabs.length - 1);
+								setSelectedTabIndex(Math.min(selectedTabIndex, tabs.length - 1));
 
-							return [...tabs];
+								return [...tabs];
+							});
 						});
 					}
 				}}
 			>
-				<SpacedriveInterface
-					routing={{
-						router: tab.router,
-						routerKey: tabIndex,
-						currentIndex: tab.currentIndex,
-						maxIndex: tab.maxIndex
-					}}
-				/>
+				<PlatformUpdaterProvider>
+					<SpacedriveInterfaceRoot>
+						{tabs.map((tab, index) =>
+							createPortal(
+								<SpacedriveRouterProvider
+									key={tab.id}
+									routing={{
+										routes,
+										visible: selectedTabIndex === tabs.indexOf(tab),
+										router: tab.router,
+										currentIndex: tab.currentIndex,
+										tabId: tab.id,
+										maxIndex: tab.maxIndex
+									}}
+								/>,
+								tab.element
+							)
+						)}
+						<div ref={ref} />
+					</SpacedriveInterfaceRoot>
+				</PlatformUpdaterProvider>
 			</TabsContext.Provider>
 		</RouteTitleContext.Provider>
+	);
+}
+
+function PlatformUpdaterProvider(props: PropsWithChildren) {
+	const { t } = useLocale();
+
+	return (
+		<PlatformProvider
+			platform={useMemo(
+				() => ({
+					...platform,
+					updater: window.__SD_UPDATER__ ? createUpdater(t) : undefined
+				}),
+				[t]
+			)}
+		>
+			{props.children}
+		</PlatformProvider>
 	);
 }

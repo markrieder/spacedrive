@@ -1,28 +1,38 @@
 import { Plus, X } from '@phosphor-icons/react';
 import clsx from 'clsx';
-import { useLayoutEffect, useRef } from 'react';
-import { useKey } from 'rooks';
+import { useEffect, useLayoutEffect, useRef } from 'react';
 import useResizeObserver from 'use-resize-observer';
+import { useSelector } from '@sd/client';
 import { Tooltip } from '@sd/ui';
-import { useKeyMatcher, useOperatingSystem, useShowControls } from '~/hooks';
+import {
+	useKeyMatcher,
+	useLocale,
+	useOperatingSystem,
+	useShortcut,
+	useShowControls,
+	useWindowState
+} from '~/hooks';
 import { useTabsContext } from '~/TabsContext';
 
-import SearchOptions from '../Explorer/Search';
-import { useSearchContext } from '../Explorer/Search/Context';
-import { useSearchStore } from '../Explorer/Search/store';
-import { useExplorerStore } from '../Explorer/store';
-import { useTopBarContext } from './Layout';
+import { explorerStore } from '../Explorer/store';
+import { useLayoutStore } from '../Layout/store';
+import { useTopBarContext } from './Context';
 import { NavigationButtons } from './NavigationButtons';
-import SearchBar from './SearchBar';
 
+// million-ignore
 const TopBar = () => {
 	const transparentBg = useShowControls().transparentBg;
-	const { isDragging } = useExplorerStore();
+	const isDragSelecting = useSelector(explorerStore, (s) => s.isDragSelecting);
+
 	const ref = useRef<HTMLDivElement>(null);
 
 	const tabs = useTabsContext();
 	const ctx = useTopBarContext();
-	const searchCtx = useSearchContext();
+
+	const windowState = useWindowState();
+	const platform = useOperatingSystem();
+
+	const layoutStore = useLayoutStore();
 
 	useResizeObserver({
 		ref,
@@ -33,12 +43,25 @@ const TopBar = () => {
 		}
 	});
 
+	//prevent default search from opening from edge webview
+	useEffect(() => {
+		const handleKeyDown = (e: KeyboardEvent) => {
+			if (e.key === 'f' && e.ctrlKey) {
+				e.preventDefault();
+			}
+		};
+		document.body.addEventListener('keydown', handleKeyDown);
+		return () => {
+			document.body.removeEventListener('keydown', handleKeyDown);
+		};
+	}, []);
+
 	// when the component mounts + crucial state changes, we need to update the height _before_ the browser paints
 	// in order to avoid jank. resize observer doesn't fire early enought to account for this.
 	useLayoutEffect(() => {
 		const height = ref.current!.getBoundingClientRect().height;
 		ctx.setTopBarHeight.call(undefined, height);
-	}, [ctx.setTopBarHeight, searchCtx.isSearching]);
+	}, [ctx.setTopBarHeight]);
 
 	return (
 		<div
@@ -54,7 +77,11 @@ const TopBar = () => {
 				className={clsx(
 					'flex h-12 items-center gap-3.5 overflow-hidden px-3.5',
 					'duration-250 transition-[background-color,border-color] ease-out',
-					isDragging && 'pointer-events-none'
+					isDragSelecting && 'pointer-events-none',
+					platform === 'macOS' &&
+						!windowState.isFullScreen &&
+						layoutStore.sidebar.collapsed &&
+						'pl-20'
 				)}
 			>
 				<div
@@ -65,19 +92,14 @@ const TopBar = () => {
 					<div ref={ctx.setLeft} className="overflow-hidden" />
 				</div>
 
-				{ctx.fixedArgs && <SearchBar />}
+				<div ref={ctx.setCenter} />
 
-				<div ref={ctx.setRight} className={clsx(ctx.fixedArgs && 'flex-1')} />
+				<div ref={ctx.setRight} className="flex-1" />
 			</div>
 
 			{tabs && <Tabs />}
 
-			{searchCtx.isSearching && (
-				<>
-					<hr className="w-full border-t border-sidebar-divider bg-sidebar-divider" />
-					<SearchOptions />
-				</>
-			)}
+			<div ref={ctx.setChildren} />
 		</div>
 	);
 };
@@ -87,6 +109,8 @@ export default TopBar;
 function Tabs() {
 	const ctx = useTabsContext()!;
 	const keybind = useKeyMatcher('Meta');
+
+	const { t } = useLocale();
 
 	function addTab() {
 		ctx.createTab();
@@ -114,10 +138,10 @@ function Tabs() {
 						else if (e.button === 1) removeTab(index);
 					}}
 					className={clsx(
-						'duration-[50ms] group relative flex h-full min-w-[10rem] shrink-0 flex-row items-center justify-center px-8 text-center',
+						'duration-[50ms] group relative flex h-full min-w-40 shrink-0 flex-row items-center justify-center px-8 text-center',
 						ctx.tabIndex === index
 							? 'text-ink'
-							: 'top-bar-blur bg-sidebar transition-colors hover:bg-app/50'
+							: 'top-bar-blur border-t border-sidebar-divider bg-sidebar/30 text-ink-faint/60 transition-colors hover:bg-app/50'
 					)}
 					key={index}
 				>
@@ -128,7 +152,7 @@ function Tabs() {
 								e.stopPropagation();
 								removeTab(index);
 							}}
-							className="absolute right-2 rounded p-1 opacity-0 transition-opacity hover:bg-app-selected group-hover:opacity-100"
+							className="absolute right-2 rounded p-1 text-ink opacity-0 transition-opacity hover:bg-app-selected group-hover:opacity-100"
 						>
 							<X />
 						</div>
@@ -136,10 +160,10 @@ function Tabs() {
 				</button>
 			))}
 			<div
-				className="flex h-full flex-1 items-center justify-start bg-sidebar px-2"
+				className="flex h-full flex-1 items-center justify-start border-t border-sidebar-divider bg-sidebar/30 px-2"
 				data-tauri-drag-region
 			>
-				<Tooltip keybinds={[keybind.icon, 'T']} label="New Tab">
+				<Tooltip keybinds={[keybind.icon, 'T']} label={t('new_tab')}>
 					<button
 						onClick={addTab}
 						className="duration-[50ms] flex flex-row items-center justify-center rounded p-1.5 transition-colors hover:bg-app/80"
@@ -154,33 +178,25 @@ function Tabs() {
 
 function useTabKeybinds(props: { addTab(): void; removeTab(index: number): void }) {
 	const ctx = useTabsContext()!;
-	const os = useOperatingSystem();
 
-	// these keybinds aren't part of the regular shortcuts system as they're desktop-only
-	useKey(['t'], (e) => {
-		if ((os === 'macOS' && !e.metaKey) || (os !== 'macOS' && !e.ctrlKey)) return;
-
+	useShortcut('newTab', (e) => {
 		e.stopPropagation();
-
+		if (e.shiftKey) return; //to prevent colliding with 'navToSettings' shortcut
 		props.addTab();
 	});
 
-	useKey(['w'], (e) => {
-		if ((os === 'macOS' && !e.metaKey) || (os !== 'macOS' && !e.ctrlKey)) return;
-
+	useShortcut('closeTab', (e) => {
 		e.stopPropagation();
-
 		props.removeTab(ctx.tabIndex);
 	});
 
-	useKey(['ArrowLeft', 'ArrowRight'], (e) => {
-		// TODO: figure out non-macos keybind
-		if ((os === 'macOS' && !(e.metaKey && e.altKey)) || os !== 'macOS') return;
-
+	useShortcut('nextTab', (e) => {
 		e.stopPropagation();
+		ctx.setTabIndex(Math.min(ctx.tabIndex + 1, ctx.tabs.length - 1));
+	});
 
-		const delta = e.key === 'ArrowLeft' ? -1 : 1;
-
-		ctx.setTabIndex(Math.min(Math.max(0, ctx.tabIndex + delta), ctx.tabs.length - 1));
+	useShortcut('previousTab', (e) => {
+		e.stopPropagation();
+		ctx.setTabIndex(Math.max(ctx.tabIndex - 1, 0));
 	});
 }

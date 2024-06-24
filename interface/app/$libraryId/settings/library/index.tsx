@@ -11,9 +11,9 @@ export default [
 			{ path: 'sync', lazy: () => import('./sync') },
 			{ path: 'general', lazy: () => import('./general') },
 			{ path: 'tags', lazy: () => import('./tags') },
+			// { path: 'saved-searches', lazy: () => import('./saved-searches') },
 			//this is for edit in tags context menu
 			{ path: 'tags/:id', lazy: () => import('./tags') },
-			{ path: 'nodes', lazy: () => import('./nodes') },
 			{ path: 'locations', lazy: () => import('./locations') }
 		]
 	},

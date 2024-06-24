@@ -1,14 +1,15 @@
+import { AlphaClient } from '@oscartbeaumont-sd/rspc-client/v2';
 import { createContext, PropsWithChildren, useContext, useMemo } from 'react';
 
-import { LibraryConfigWrapped } from '../core';
+import { LibraryConfigWrapped, Procedures } from '../core';
 import { valtioPersist } from '../lib';
 import { useBridgeQuery } from '../rspc';
 
 // The name of the localStorage key for caching library data
-const libraryCacheLocalStorageKey = 'sd-library-list';
+const libraryCacheLocalStorageKey = 'sd-library-list3'; // number is because the format of this underwent breaking changes
 
-export const useCachedLibraries = () =>
-	useBridgeQuery(['library.list'], {
+export const useCachedLibraries = () => {
+	const result = useBridgeQuery(['library.list'], {
 		keepPreviousData: true,
 		initialData: () => {
 			const cachedData = localStorage.getItem(libraryCacheLocalStorageKey);
@@ -24,8 +25,35 @@ export const useCachedLibraries = () =>
 
 			return undefined;
 		},
-		onSuccess: (data) => localStorage.setItem(libraryCacheLocalStorageKey, JSON.stringify(data))
+		onSuccess: (data) => {
+			if (data.length > 0)
+				localStorage.setItem(libraryCacheLocalStorageKey, JSON.stringify(data));
+		}
 	});
+
+	return result;
+};
+
+export async function getCachedLibraries(client: AlphaClient<Procedures>) {
+	const cachedData = localStorage.getItem(libraryCacheLocalStorageKey);
+
+	const libraries = client.query(['library.list']).then((result) => {
+		localStorage.setItem(libraryCacheLocalStorageKey, JSON.stringify(result));
+		return result;
+	});
+
+	if (cachedData) {
+		// If we fail to load cached data, it's fine
+		try {
+			const data = JSON.parse(cachedData);
+			return data as LibraryConfigWrapped[];
+		} catch (e) {
+			console.error("Error loading cached 'sd-library-list' data", e);
+		}
+	}
+
+	return await libraries;
+}
 
 export interface ClientContext {
 	currentLibraryId: string | null;
@@ -66,6 +94,7 @@ export const ClientContextProvider = ({
 	);
 };
 
+// million-ignore
 export const useClientContext = () => {
 	const ctx = useContext(ClientContext);
 

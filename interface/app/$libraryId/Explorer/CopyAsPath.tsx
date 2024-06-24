@@ -1,13 +1,16 @@
 import { ClipboardText } from '@phosphor-icons/react';
 import { toast } from '@sd/ui';
 import { Menu } from '~/components/Menu';
+import { useLocale } from '~/hooks';
 
 export const CopyAsPathBase = (
 	props: { path: string } | { getPath: () => Promise<string | null> }
 ) => {
+	const { t } = useLocale();
+
 	return (
 		<Menu.Item
-			label="Copy as path"
+			label={t('copy_as_path')}
 			icon={ClipboardText}
 			onClick={async () => {
 				try {
@@ -23,8 +26,8 @@ export const CopyAsPathBase = (
 					navigator.clipboard.writeText(path);
 				} catch (error) {
 					toast.error({
-						title: `Failed to copy file path`,
-						body: `Error: ${error}.`
+						title: t('failed_to_copy_file_path'),
+						body: t('error_message', { error })
 					});
 				}
 			}}

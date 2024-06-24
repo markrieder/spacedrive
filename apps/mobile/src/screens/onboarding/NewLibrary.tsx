@@ -1,18 +1,22 @@
-import { Database } from '@sd/assets/icons';
+import * as Haptics from 'expo-haptics';
 import { Controller } from 'react-hook-form';
-import { Alert, Image, Text, View } from 'react-native';
-import { Input } from '~/components/form/Input';
+import { Alert, Text, View } from 'react-native';
+import { useOnboardingContext } from '~/components/context/OnboardingContext';
+import { Icon } from '~/components/icons/Icon';
 import { Button } from '~/components/primitive/Button';
+import { Input } from '~/components/primitive/Input';
 import { tw } from '~/lib/tailwind';
 import { OnboardingStackScreenProps } from '~/navigation/OnboardingNavigator';
 
-import { useOnboardingContext } from './context';
 import { OnboardingContainer, OnboardingDescription, OnboardingTitle } from './GetStarted';
 
 const NewLibraryScreen = ({ navigation }: OnboardingStackScreenProps<'NewLibrary'>) => {
 	const form = useOnboardingContext().forms.useForm('NewLibrary');
 
-	const handleNewLibrary = form.handleSubmit(() => navigation.navigate('Privacy'));
+	const handleNewLibrary = form.handleSubmit(() => {
+		Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+		navigation.navigate('Privacy');
+	});
 
 	const handleImport = () => {
 		Alert.alert('TODO');
@@ -20,7 +24,7 @@ const NewLibraryScreen = ({ navigation }: OnboardingStackScreenProps<'NewLibrary
 
 	return (
 		<OnboardingContainer>
-			<Image source={Database} style={tw`h-25 w-25`} />
+			<Icon name="Database" style={tw`h-25 w-25`} />
 			<OnboardingTitle style={tw`mt-4`}>Create a Library</OnboardingTitle>
 			<View style={tw`w-full px-4`}>
 				<OnboardingDescription style={tw`mt-4`}>

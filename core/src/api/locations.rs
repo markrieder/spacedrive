@@ -1,28 +1,30 @@
 use crate::{
 	invalidate_query,
-	job::StatefulJob,
 	location::{
-		delete_location, find_location,
-		indexer::{rules::IndexerRuleCreateArgs, IndexerJobInit},
-		light_scan_location, location_with_indexer_rules,
-		non_indexed::NonIndexedPathItem,
+		delete_location, find_location, light_scan_location, non_indexed::NonIndexedPathItem,
 		relink_location, scan_location, scan_location_sub_path, LocationCreateArgs, LocationError,
-		LocationUpdateArgs,
+		LocationUpdateArgs, ScanState,
 	},
-	object::file_identifier::file_identifier_job::FileIdentifierJobInit,
 	p2p::PeerMetadata,
-	prisma::{file_path, indexer_rule, indexer_rules_in_location, location, object, SortOrder},
 	util::AbortOnDrop,
 };
 
+use sd_core_heavy_lifting::{media_processor::ThumbKey, JobName};
+use sd_core_indexer_rules::IndexerRuleCreateArgs;
+use sd_core_prisma_helpers::{
+	file_path_for_frontend, label_with_objects, location_with_indexer_rules, object_with_file_paths,
+};
+
+use sd_prisma::prisma::{file_path, indexer_rule, indexer_rules_in_location, location, SortOrder};
+
 use std::path::{Path, PathBuf};
 
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, FixedOffset, Utc};
 use directories::UserDirs;
-use rspc::{self, alpha::AlphaRouter, ErrorCode};
+use rspc::{alpha::AlphaRouter, ErrorCode};
 use serde::{Deserialize, Serialize};
 use specta::Type;
-use tracing::error;
+use tracing::{debug, error};
 
 use super::{utils::library, Ctx, R};
 
@@ -30,34 +32,56 @@ use super::{utils::library, Ctx, R};
 #[serde(tag = "type")]
 pub enum ExplorerItem {
 	Path {
-		// has_local_thumbnail is true only if there is local existence of a thumbnail
-		has_local_thumbnail: bool,
-		// thumbnail_key is present if there is a cas_id
-		// it includes the shard hex formatted as (["f0", "cab34a76fbf3469f"])
-		thumbnail_key: Option<Vec<String>>,
-		item: file_path_with_object::Data,
+		// provide the frontend with the thumbnail key explicitly
+		thumbnail: Option<ThumbKey>,
+		// this tells the frontend if a thumbnail actually exists or not
+		has_created_thumbnail: bool,
+		// we can't actually modify data from PCR types, thats why computed properties are used on ExplorerItem
+		item: Box<file_path_for_frontend::Data>,
 	},
 	Object {
-		has_local_thumbnail: bool,
-		thumbnail_key: Option<Vec<String>>,
+		thumbnail: Option<ThumbKey>,
+		has_created_thumbnail: bool,
 		item: object_with_file_paths::Data,
 	},
-	Location {
-		has_local_thumbnail: bool,
-		thumbnail_key: Option<Vec<String>>,
-		item: location::Data,
-	},
 	NonIndexedPath {
-		has_local_thumbnail: bool,
-		thumbnail_key: Option<Vec<String>>,
+		thumbnail: Option<ThumbKey>,
+		has_created_thumbnail: bool,
 		item: NonIndexedPathItem,
 	},
+	Location {
+		item: location::Data,
+	},
 	SpacedropPeer {
-		has_local_thumbnail: bool,
-		thumbnail_key: Option<Vec<String>>,
 		item: PeerMetadata,
 	},
+	Label {
+		thumbnails: Vec<ThumbKey>,
+		item: label_with_objects::Data,
+	},
 }
+
+impl ExplorerItem {
+	pub fn id(&self) -> String {
+		let ty = match self {
+			ExplorerItem::Path { .. } => "FilePath",
+			ExplorerItem::Object { .. } => "Object",
+			ExplorerItem::Location { .. } => "Location",
+			ExplorerItem::NonIndexedPath { .. } => "NonIndexedPath",
+			ExplorerItem::SpacedropPeer { .. } => "SpacedropPeer",
+			ExplorerItem::Label { .. } => "Label",
+		};
+		match self {
+			ExplorerItem::Path { item, .. } => format!("{ty}:{}", item.id),
+			ExplorerItem::Object { item, .. } => format!("{ty}:{}", item.id),
+			ExplorerItem::Location { item, .. } => format!("{ty}:{}", item.id),
+			ExplorerItem::NonIndexedPath { item, .. } => format!("{ty}:{}", item.path),
+			ExplorerItem::SpacedropPeer { item, .. } => format!("{ty}:{}", item.name), // TODO: Use a proper primary key
+			ExplorerItem::Label { item, .. } => format!("{ty}:{}", item.name),
+		}
+	}
+}
+
 #[derive(Serialize, Type, Debug)]
 pub struct SystemLocations {
 	desktop: Option<PathBuf>,
@@ -84,11 +108,8 @@ impl From<UserDirs> for SystemLocations {
 impl ExplorerItem {
 	pub fn name(&self) -> &str {
 		match self {
-			ExplorerItem::Path {
-				item: file_path_with_object::Data { name, .. },
-				..
-			}
-			| ExplorerItem::Location {
+			ExplorerItem::Path { item, .. } => item.name.as_deref().unwrap_or(""),
+			ExplorerItem::Location {
 				item: location::Data { name, .. },
 				..
 			} => name.as_deref().unwrap_or(""),
@@ -99,13 +120,8 @@ impl ExplorerItem {
 
 	pub fn size_in_bytes(&self) -> u64 {
 		match self {
-			ExplorerItem::Path {
-				item: file_path_with_object::Data {
-					size_in_bytes_bytes,
-					..
-				},
-				..
-			} => size_in_bytes_bytes
+			ExplorerItem::Path { item, .. } => item
+				.size_in_bytes_bytes
 				.as_ref()
 				.map(|size| {
 					u64::from_be_bytes([
@@ -136,11 +152,10 @@ impl ExplorerItem {
 
 	pub fn date_created(&self) -> DateTime<Utc> {
 		match self {
-			ExplorerItem::Path {
-				item: file_path_with_object::Data { date_created, .. },
-				..
+			ExplorerItem::Path { item, .. } => {
+				item.date_created.map(Into::into).unwrap_or_default()
 			}
-			| ExplorerItem::Object {
+			ExplorerItem::Object {
 				item: object_with_file_paths::Data { date_created, .. },
 				..
 			}
@@ -164,9 +179,6 @@ impl ExplorerItem {
 		}
 	}
 }
-
-file_path::include!(file_path_with_object { object });
-object::include!(object_with_file_paths { file_paths });
 
 pub(crate) fn mount() -> AlphaRouter<Ctx> {
 	R.router()
@@ -193,6 +205,49 @@ pub(crate) fn mount() -> AlphaRouter<Ctx> {
 				})
 		})
 		.procedure("getWithRules", {
+			#[derive(Type, Serialize)]
+			struct LocationWithIndexerRule {
+				pub id: i32,
+				pub pub_id: Vec<u8>,
+				pub name: Option<String>,
+				pub path: Option<String>,
+				pub total_capacity: Option<i32>,
+				pub available_capacity: Option<i32>,
+				pub size_in_bytes: Option<Vec<u8>>,
+				pub is_archived: Option<bool>,
+				pub generate_preview_media: Option<bool>,
+				pub sync_preview_media: Option<bool>,
+				pub hidden: Option<bool>,
+				pub date_created: Option<DateTime<FixedOffset>>,
+				pub instance_id: Option<i32>,
+				pub indexer_rules: Vec<indexer_rule::Data>,
+			}
+
+			impl LocationWithIndexerRule {
+				pub fn from_db(value: location_with_indexer_rules::Data) -> Self {
+					Self {
+						id: value.id,
+						pub_id: value.pub_id,
+						name: value.name,
+						path: value.path,
+						total_capacity: value.total_capacity,
+						available_capacity: value.available_capacity,
+						size_in_bytes: value.size_in_bytes,
+						is_archived: value.is_archived,
+						generate_preview_media: value.generate_preview_media,
+						sync_preview_media: value.sync_preview_media,
+						hidden: value.hidden,
+						date_created: value.date_created,
+						instance_id: value.instance_id,
+						indexer_rules: value
+							.indexer_rules
+							.into_iter()
+							.map(|i| i.indexer_rule)
+							.collect::<Vec<_>>(),
+					}
+				}
+			}
+
 			R.with2(library())
 				.query(|(_, library), location_id: location::id::Type| async move {
 					Ok(library
@@ -201,7 +256,8 @@ pub(crate) fn mount() -> AlphaRouter<Ctx> {
 						.find_unique(location::id::equals(location_id))
 						.include(location_with_indexer_rules::include())
 						.exec()
-						.await?)
+						.await?
+						.map(LocationWithIndexerRule::from_db))
 				})
 		})
 		.procedure("create", {
@@ -209,7 +265,7 @@ pub(crate) fn mount() -> AlphaRouter<Ctx> {
 				.mutation(|(node, library), args: LocationCreateArgs| async move {
 					if let Some(location) = args.create(&node, &library).await? {
 						let id = Some(location.id);
-						scan_location(&node, &library, location).await?;
+						scan_location(&node, &library, location, ScanState::Pending).await?;
 						invalidate_query!(library, "locations.list");
 						Ok(id)
 					} else {
@@ -247,7 +303,8 @@ pub(crate) fn mount() -> AlphaRouter<Ctx> {
 				.mutation(|(node, library), args: LocationCreateArgs| async move {
 					if let Some(location) = args.add_library(&node, &library).await? {
 						let id = location.id;
-						scan_location(&node, &library, location).await?;
+						let location_scan_state = ScanState::try_from(location.scan_state)?;
+						scan_location(&node, &library, location, location_scan_state).await?;
 						invalidate_query!(library, "locations.list");
 						Ok(Some(id))
 					} else {
@@ -261,7 +318,6 @@ pub(crate) fn mount() -> AlphaRouter<Ctx> {
 				pub location_id: location::id::Type,
 				pub reidentify_objects: bool,
 			}
-
 			R.with2(library()).mutation(
 				|(node, library),
 				 FullRescanArgs {
@@ -269,7 +325,7 @@ pub(crate) fn mount() -> AlphaRouter<Ctx> {
 				     reidentify_objects,
 				 }| async move {
 					if reidentify_objects {
-						library
+						let count = library
 							.db
 							.file_path()
 							.update_many(
@@ -286,21 +342,23 @@ pub(crate) fn mount() -> AlphaRouter<Ctx> {
 							.exec()
 							.await?;
 
-						library.orphan_remover.invoke().await;
+						debug!(%count, "Disconnected file paths from objects;");
+
+						// library.orphan_remover.invoke().await;
 					}
 
+					let location = find_location(&library, location_id)
+						.include(location_with_indexer_rules::include())
+						.exec()
+						.await?
+						.ok_or(LocationError::IdNotFound(location_id))?;
+
+					let location_scan_state = ScanState::try_from(location.scan_state)?;
+
 					// rescan location
-					scan_location(
-						&node,
-						&library,
-						find_location(&library, location_id)
-							.include(location_with_indexer_rules::include())
-							.exec()
-							.await?
-							.ok_or(LocationError::IdNotFound(location_id))?,
-					)
-					.await
-					.map_err(Into::into)
+					scan_location(&node, &library, location, location_scan_state)
+						.await
+						.map_err(Into::into)
 				},
 			)
 		})
@@ -346,13 +404,15 @@ pub(crate) fn mount() -> AlphaRouter<Ctx> {
 				     sub_path,
 				 }: LightScanArgs| async move {
 					if node
-						.jobs
-						.has_job_running(|job_identity| {
-							job_identity.target_location == location_id
-								&& (job_identity.name == <IndexerJobInit as StatefulJob>::NAME
-									|| job_identity.name
-										== <FileIdentifierJobInit as StatefulJob>::NAME)
-						})
+						.job_system
+						.check_running_jobs(
+							vec![
+								JobName::Indexer,
+								JobName::FileIdentifier,
+								JobName::MediaProcessor,
+							],
+							location_id,
+						)
 						.await
 					{
 						return Err(rspc::Error::new(
@@ -370,7 +430,7 @@ pub(crate) fn mount() -> AlphaRouter<Ctx> {
 					let handle = tokio::spawn(async move {
 						if let Err(e) = light_scan_location(node, library, location, sub_path).await
 						{
-							error!("light scan error: {e:#?}");
+							error!(?e, "Light scan error;");
 						}
 					});
 
@@ -412,7 +472,7 @@ fn mount_indexer_rule_routes() -> AlphaRouter<Ctx> {
 		.procedure("create", {
 			R.with2(library())
 				.mutation(|(_, library), args: IndexerRuleCreateArgs| async move {
-					if args.create(&library).await?.is_some() {
+					if args.create(&library.db).await?.is_some() {
 						invalidate_query!(library, "locations.indexer_rules.list");
 					}
 
@@ -481,28 +541,21 @@ fn mount_indexer_rule_routes() -> AlphaRouter<Ctx> {
 		})
 		.procedure("list", {
 			R.with2(library()).query(|(_, library), _: ()| async move {
-				library
-					.db
-					.indexer_rule()
-					.find_many(vec![])
-					.exec()
-					.await
-					.map_err(Into::into)
+				Ok(library.db.indexer_rule().find_many(vec![]).exec().await?)
 			})
 		})
 		// list indexer rules for location, returning the indexer rule
 		.procedure("listForLocation", {
 			R.with2(library())
 				.query(|(_, library), location_id: location::id::Type| async move {
-					library
+					Ok(library
 						.db
 						.indexer_rule()
 						.find_many(vec![indexer_rule::locations::some(vec![
 							indexer_rules_in_location::location_id::equals(location_id),
 						])])
 						.exec()
-						.await
-						.map_err(Into::into)
+						.await?)
 				})
 		})
 }

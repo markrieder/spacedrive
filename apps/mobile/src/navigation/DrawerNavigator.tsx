@@ -1,6 +1,6 @@
 import { createDrawerNavigator, DrawerScreenProps } from '@react-navigation/drawer';
 import { CompositeScreenProps, NavigatorScreenParams } from '@react-navigation/native';
-import { StackScreenProps } from '@react-navigation/stack';
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import DrawerContent from '~/components/drawer/DrawerContent';
 import { tw } from '~/lib/tailwind';
 
@@ -19,7 +19,9 @@ export default function DrawerNavigator() {
 				headerShown: false,
 				drawerStyle: {
 					backgroundColor: tw.color('app-darkBox'),
-					width: '70%'
+					width: '70%',
+					borderRightWidth: 1.5,
+					borderRightColor: tw.color('app-cardborder')
 				},
 				overlayColor: 'transparent',
 				drawerType: 'slide',
@@ -38,5 +40,5 @@ export type DrawerNavParamList = {
 
 export type HomeDrawerScreenProps<Screen extends keyof DrawerNavParamList> = CompositeScreenProps<
 	DrawerScreenProps<DrawerNavParamList, Screen>,
-	StackScreenProps<RootStackParamList, 'Root'>
+	NativeStackScreenProps<RootStackParamList, 'Root'>
 >;

@@ -1,15 +1,13 @@
+use sd_prisma::prisma::notification;
+
+use crate::api::{Ctx, R};
 use async_stream::stream;
 use chrono::{DateTime, Utc};
 use futures::future::join_all;
 use rspc::{alpha::AlphaRouter, ErrorCode};
-use sd_prisma::prisma::notification;
 use serde::{Deserialize, Serialize};
 use specta::Type;
 use uuid::Uuid;
-
-use crate::api::{Ctx, R};
-
-use super::utils::library;
 
 /// Represents a single notification.
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
@@ -27,13 +25,22 @@ pub enum NotificationId {
 	Library(Uuid, u32),
 	Node(u32),
 }
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub enum NotificationKind {
+	Info,
+	Success,
+	Error,
+	Warning,
+}
 
 /// Represents the data of a single notification.
 /// This data is used by the frontend to properly display the notification.
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
-pub enum NotificationData {
-	PairingRequest { id: Uuid, pairing_id: u16 },
-	Test,
+pub struct NotificationData {
+	pub title: String,
+	pub content: String,
+	pub kind: NotificationKind,
 }
 
 pub(crate) fn mount() -> AlphaRouter<Ctx> {
@@ -49,12 +56,12 @@ pub(crate) fn mount() -> AlphaRouter<Ctx> {
 							.find_many(vec![])
 							.exec()
 							.await
-							.map_err(|err| {
+							.map_err(|e| {
 								rspc::Error::new(
 									ErrorCode::InternalServerError,
 									format!(
 										"Failed to get notifications for library '{}': {}",
-										library.id, err
+										library.id, e
 									),
 								)
 							})?
@@ -62,12 +69,12 @@ pub(crate) fn mount() -> AlphaRouter<Ctx> {
 							.map(|n| {
 								Ok(Notification {
 									id: NotificationId::Library(library.id, n.id as u32),
-									data: rmp_serde::from_slice(&n.data).map_err(|err| {
+									data: rmp_serde::from_slice(&n.data).map_err(|e| {
 										rspc::Error::new(
 											ErrorCode::InternalServerError,
 											format!(
 												"Failed to get notifications for library '{}': {}",
-												library.id, err
+												library.id, e
 											),
 										)
 									})?,
@@ -101,19 +108,19 @@ pub(crate) fn mount() -> AlphaRouter<Ctx> {
 							.delete_many(vec![notification::id::equals(id as i32)])
 							.exec()
 							.await
-							.map_err(|err| {
-								rspc::Error::new(ErrorCode::InternalServerError, err.to_string())
+							.map_err(|e| {
+								rspc::Error::new(ErrorCode::InternalServerError, e.to_string())
 							})?;
 					}
 					NotificationId::Node(id) => {
 						node.config
-							.write(|mut cfg| {
+							.write(|cfg| {
 								cfg.notifications
 									.retain(|n| n.id != NotificationId::Node(id));
 							})
 							.await
-							.map_err(|err| {
-								rspc::Error::new(ErrorCode::InternalServerError, err.to_string())
+							.map_err(|e| {
+								rspc::Error::new(ErrorCode::InternalServerError, e.to_string())
 							})?;
 					}
 				}
@@ -124,13 +131,11 @@ pub(crate) fn mount() -> AlphaRouter<Ctx> {
 		.procedure("dismissAll", {
 			R.query(|node, _: ()| async move {
 				node.config
-					.write(|mut cfg| {
+					.write(|cfg| {
 						cfg.notifications = vec![];
 					})
 					.await
-					.map_err(|err| {
-						rspc::Error::new(ErrorCode::InternalServerError, err.to_string())
-					})?;
+					.map_err(|e| rspc::Error::new(ErrorCode::InternalServerError, e.to_string()))?;
 
 				join_all(
 					node.libraries
@@ -158,18 +163,5 @@ pub(crate) fn mount() -> AlphaRouter<Ctx> {
 					}
 				}
 			})
-		})
-		.procedure("test", {
-			R.mutation(|node, _: ()| async move {
-				node.emit_notification(NotificationData::Test, None).await;
-			})
-		})
-		.procedure("testLibrary", {
-			R.with2(library())
-				.mutation(|(_, library), _: ()| async move {
-					library
-						.emit_notification(NotificationData::Test, None)
-						.await;
-				})
 		})
 }

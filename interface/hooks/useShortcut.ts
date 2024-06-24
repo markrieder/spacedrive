@@ -1,221 +1,193 @@
+import { useMemo } from 'react';
 import { useKeys } from 'rooks';
 import { useSnapshot } from 'valtio';
 import { valtioPersist } from '@sd/client';
+import { useRoutingContext } from '~/RoutingContext';
+import { OperatingSystem } from '~/util/Platform';
 
-import { OperatingSystem } from '../util/Platform';
 import { useOperatingSystem } from './useOperatingSystem';
 
-const state = {
-	gridView: {
-		keys: {
-			macOS: ['Meta', '1'],
-			all: ['Control', '1']
-		}
+type Shortcut = Partial<Record<OperatingSystem | 'all', string[]>>;
+
+const shortcuts = {
+	newTab: {
+		macOS: ['Meta', 'KeyT'],
+		all: ['Control', 'KeyT']
 	},
-	listView: {
-		keys: {
-			macOS: ['Meta', '2'],
-			all: ['Control', '2']
-		}
+	closeTab: {
+		macOS: ['Meta', 'KeyW'],
+		all: ['Control', 'KeyW']
 	},
-	mediaView: {
-		keys: {
-			macOS: ['Meta', '3'],
-			all: ['Control', '3']
-		}
+	nextTab: {
+		macOS: ['Meta', 'Alt', 'ArrowRight'],
+		all: ['Control', 'Alt', 'ArrowRight']
 	},
-	showHiddenFiles: {
-		keys: {
-			macOS: ['Meta', 'Shift', '.'],
-			all: ['Control', 'Shift', '.']
-		}
+	toggleCommandPalette: {
+		macOS: ['Meta', 'KeyK'],
+		all: ['Control', 'KeyK']
 	},
-	showPathBar: {
-		keys: {
-			macOS: ['Alt', 'Meta', 'KeyP'],
-			all: ['Alt', 'Control', 'KeyP']
-		}
+	closeCommandPalette: {
+		all: ['Escape']
 	},
-	showImageSlider: {
-		keys: {
-			macOS: ['Alt', 'Meta', 'KeyM'],
-			all: ['Alt', 'Control', 'KeyM']
-		}
-	},
-	showInspector: {
-		keys: {
-			macOS: ['Meta', 'KeyI'],
-			all: ['Control', 'KeyI']
-		}
+	previousTab: {
+		macOS: ['Meta', 'Alt', 'ArrowLeft'],
+		all: ['Control', 'Alt', 'ArrowLeft']
 	},
 	toggleJobManager: {
-		keys: {
-			macOS: ['Meta', 'KeyJ'],
-			all: ['Control', 'KeyJ']
-		}
+		macOS: ['Meta', 'KeyJ'],
+		all: ['Control', 'KeyJ']
 	},
-	toggleQuickPreview: {
-		keys: {
-			all: [' ']
-		}
-	},
-	toggleMetaData: {
-		keys: {
-			macOS: ['Meta', 'KeyI'],
-			all: ['Control', 'KeyI']
-		}
-	},
-	quickPreviewMoveBack: {
-		keys: {
-			all: ['ArrowLeft']
-		}
-	},
-	quickPreviewMoveForward: {
-		keys: {
-			all: ['ArrowRight']
-		}
-	},
-	revealNative: {
-		keys: {
-			macOS: ['Meta', 'KeyY'],
-			all: ['Control', 'KeyY']
-		}
-	},
-	renameObject: {
-		keys: {
-			macOS: ['Enter'],
-			all: ['F2']
-		}
-	},
-	rescan: {
-		keys: {
-			macOS: ['Meta', 'KeyR'],
-			all: ['Control', 'KeyR']
-		}
-	},
-	cutObject: {
-		keys: {
-			macOS: ['Meta', 'KeyX'],
-			all: ['Control', 'KeyX']
-		}
-	},
-	copyObject: {
-		keys: {
-			macOS: ['Meta', 'KeyC'],
-			all: ['Control', 'KeyC']
-		}
-	},
-	pasteObject: {
-		keys: {
-			macOS: ['Meta', 'KeyV'],
-			all: ['Control', 'KeyV']
-		}
-	},
-	duplicateObject: {
-		keys: {
-			macOS: ['Meta', 'KeyD'],
-			all: ['Control', 'KeyD']
-		}
-	},
-	openObject: {
-		keys: {
-			macOS: ['Meta', 'KeyO'],
-			all: ['Enter']
-		}
-	},
-	quickPreviewOpenNative: {
-		keys: {
-			macOS: ['Meta', 'KeyO'],
-			all: ['Enter']
-		}
-	},
-	delItem: {
-		keys: {
-			macOS: ['Meta', 'Backspace'],
-			all: ['Delete']
-		}
-	},
-	explorerEscape: {
-		keys: {
-			all: ['Escape']
-		}
-	},
-	explorerDown: {
-		keys: {
-			all: ['ArrowDown']
-		}
-	},
-	explorerUp: {
-		keys: {
-			all: ['ArrowUp']
-		}
-	},
-	explorerLeft: {
-		keys: {
-			all: ['ArrowLeft']
-		}
-	},
-	explorerRight: {
-		keys: {
-			all: ['ArrowRight']
-		}
+	toggleTagAssignMode: {
+		macOS: ['Meta', 'Alt', 'KeyT'],
+		all: ['Control', 'Alt', 'KeyT']
 	},
 	navBackwardHistory: {
-		keys: {
-			macOS: ['Meta', '['],
-			all: ['Control', '[']
-		}
+		macOS: ['Meta', '['],
+		all: ['Control', '[']
 	},
 	navForwardHistory: {
-		keys: {
-			macOS: ['Meta', ']'],
-			all: ['Control', ']']
-		}
+		macOS: ['Meta', ']'],
+		all: ['Control', ']']
 	},
 	navToSettings: {
-		keys: {
-			macOS: ['Shift', 'Meta', 'KeyT'],
-			all: ['Shift', 'Control', 'KeyT']
-		}
+		macOS: ['Shift', 'Meta', 'KeyT'],
+		all: ['Shift', 'Control', 'KeyT']
 	},
-	// navToOverview: {
-	// 	keys: {
-	// 		macOS: ['Shift', 'Meta', 'KeyO'],
-	// 		all: ['Shift', 'Control', 'KeyO']
-	// 	}
-	// },
-	navExpObjects: {
-		keys: {
-			all: ['Control', 'ArrowRight']
+	gridView: {
+		macOS: ['Meta', '1'],
+		all: ['Control', '1']
+	},
+	listView: {
+		macOS: ['Meta', '2'],
+		all: ['Control', '2']
+	},
+	mediaView: {
+		macOS: ['Meta', '3'],
+		all: ['Control', '3']
+	},
+	showHiddenFiles: {
+		macOS: ['Meta', 'Shift', '.'],
+		all: ['Control', 'KeyH']
+	},
+	showPathBar: {
+		macOS: ['Alt', 'Meta', 'KeyP'],
+		all: ['Alt', 'Control', 'KeyP']
+	},
+	showImageSlider: {
+		macOS: ['Alt', 'Meta', 'KeyM'],
+		all: ['Alt', 'Control', 'KeyM']
+	},
+	showInspector: {
+		macOS: ['Meta', 'KeyI'],
+		all: ['Control', 'KeyI']
+	},
+	toggleQuickPreview: {
+		all: [' ']
+	},
+	toggleMetaData: {
+		macOS: ['Meta', 'KeyI'],
+		all: ['Control', 'KeyI']
+	},
+	quickPreviewMoveBack: {
+		all: ['ArrowLeft']
+	},
+	quickPreviewMoveForward: {
+		all: ['ArrowRight']
+	},
+	revealNative: {
+		macOS: ['Meta', 'KeyY'],
+		all: ['Control', 'KeyY']
+	},
+	renameObject: {
+		macOS: ['Enter'],
+		all: ['F2']
+	},
+	rescan: {
+		macOS: ['Meta', 'KeyR'],
+		all: ['Control', 'KeyR']
+	},
+	cutObject: {
+		macOS: ['Meta', 'KeyX'],
+		all: ['Control', 'KeyX']
+	},
+	copyObject: {
+		macOS: ['Meta', 'KeyC'],
+		all: ['Control', 'KeyC']
+	},
+	pasteObject: {
+		macOS: ['Meta', 'KeyV'],
+		all: ['Control', 'KeyV']
+	},
+	duplicateObject: {
+		macOS: ['Meta', 'KeyD'],
+		all: ['Control', 'KeyD']
+	},
+	openObject: {
+		macOS: ['Meta', 'KeyO'],
+		all: ['Enter']
+	},
+	quickPreviewOpenNative: {
+		macOS: ['Meta', 'KeyO'],
+		all: ['Enter']
+	},
+	closeQuickPreview: {
+		all: ['Escape']
+	},
+	delItem: {
+		macOS: ['Meta', 'Backspace'],
+		all: ['Delete']
+	},
+	explorerEscape: {
+		all: ['Escape']
+	},
+	explorerDown: {
+		all: ['ArrowDown']
+	},
+	explorerUp: {
+		all: ['ArrowUp']
+	},
+	explorerLeft: {
+		all: ['ArrowLeft']
+	},
+	explorerRight: {
+		all: ['ArrowRight']
+	},
+	toggleSidebar: {
+		all: ['[']
+	}
+} satisfies Record<string, Shortcut>;
+
+export type Shortcuts = keyof typeof shortcuts;
+
+export const shortcutsStore = valtioPersist(
+	'sd-shortcuts',
+	shortcuts as Record<Shortcuts, Shortcut>
+);
+
+export const useShortcut = (
+	shortcut: Shortcuts,
+	func: (e: KeyboardEvent) => void,
+	options: Omit<Parameters<typeof useKeys>[2], 'when'> & { disabled?: boolean } = {}
+) => {
+	const os = useOperatingSystem(true);
+	const shortcuts = useSnapshot(shortcutsStore);
+	const { visible } = useRoutingContext();
+
+	const keys = useMemo(() => {
+		if (!visible) return [];
+		return shortcuts[shortcut][os] ?? shortcuts[shortcut].all ?? [];
+	}, [os, shortcut, shortcuts, visible]);
+
+	// useKeys doesn't like readonly
+	useKeys(
+		keys as string[],
+		(e) => {
+			if (!import.meta.env.DEV) e.preventDefault();
+			return func(e);
+		},
+		{
+			...options,
+			when: visible && !options.disabled
 		}
-	}
-} satisfies Record<
-	string,
-	{
-		keys: {
-			[os in OperatingSystem | 'all']?: string[];
-		};
-	}
->;
-
-const shortcutsStore = valtioPersist('sd-shortcuts', state);
-
-export function useShortcutsStore() {
-	return useSnapshot(shortcutsStore);
-}
-
-export function getShortcutsStore() {
-	return shortcutsStore;
-}
-
-type shortcutKeys = keyof typeof state;
-type osKeys = keyof (typeof state)[shortcutKeys]['keys'];
-
-export const useShortcut = (shortcut: shortcutKeys, func: (e: KeyboardEvent) => void) => {
-	const os = useOperatingSystem();
-	const shortcutsStore = getShortcutsStore();
-	const shortcutKeys =
-		shortcutsStore[shortcut].keys[os as osKeys] || shortcutsStore[shortcut].keys.all;
-
-	useKeys(shortcutKeys, func);
+	);
 };

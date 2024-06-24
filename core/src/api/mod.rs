@@ -1,11 +1,47 @@
-use crate::{invalidate_query, job::JobProgressEvent, node::config::NodeConfig, Node};
+use crate::{
+	invalidate_query,
+	node::{
+		config::{is_in_docker, NodeConfig, NodeConfigP2P, NodePreferences},
+		get_hardware_model_name, HardwareModel,
+	},
+	old_job::JobProgressEvent,
+	Node,
+};
+
+use sd_core_heavy_lifting::media_processor::ThumbKey;
+use sd_p2p::RemoteIdentity;
+use sd_prisma::prisma::file_path;
+
+use std::sync::{atomic::Ordering, Arc};
+
 use itertools::Itertools;
 use rspc::{alpha::Rspc, Config, ErrorCode};
-use sd_p2p::P2PStatus;
 use serde::{Deserialize, Serialize};
 use specta::Type;
-use std::sync::{atomic::Ordering, Arc};
 use uuid::Uuid;
+
+mod auth;
+mod backups;
+mod cloud;
+// mod categories;
+mod ephemeral_files;
+mod files;
+mod jobs;
+mod keys;
+mod labels;
+mod libraries;
+pub mod locations;
+mod models;
+mod nodes;
+pub mod notifications;
+mod p2p;
+mod preferences;
+pub(crate) mod search;
+mod sync;
+mod tags;
+pub mod utils;
+pub mod volumes;
+mod web_api;
 
 use utils::{InvalidRequests, InvalidateOperationEvent};
 
@@ -18,7 +54,12 @@ pub type Router = rspc::Router<Ctx>;
 /// Represents an internal core event, these are exposed to client via a rspc subscription.
 #[derive(Debug, Clone, Serialize, Type)]
 pub enum CoreEvent {
-	NewThumbnail { thumb_key: Vec<String> },
+	NewThumbnail {
+		thumb_key: ThumbKey,
+	},
+	NewIdentifiedObjects {
+		file_path_ids: Vec<file_path::id::Type>,
+	},
 	JobProgress(JobProgressEvent),
 	InvalidateOperation(InvalidateOperationEvent),
 }
@@ -29,44 +70,18 @@ pub enum CoreEvent {
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub enum BackendFeature {
-	SyncEmitMessages,
-	FilesOverP2P,
+	CloudSync,
 }
 
 impl BackendFeature {
 	pub fn restore(&self, node: &Node) {
 		match self {
-			BackendFeature::SyncEmitMessages => {
-				node.libraries
-					.emit_messages_flag
-					.store(true, Ordering::Relaxed);
-			}
-			BackendFeature::FilesOverP2P => {
-				node.files_over_p2p_flag.store(true, Ordering::Relaxed);
+			BackendFeature::CloudSync => {
+				node.cloud_sync_flag.store(true, Ordering::Relaxed);
 			}
 		}
 	}
 }
-
-mod auth;
-mod backups;
-// mod categories;
-mod ephemeral_files;
-mod files;
-mod jobs;
-mod keys;
-mod libraries;
-pub mod locations;
-mod nodes;
-pub mod notifications;
-mod p2p;
-mod preferences;
-pub(crate) mod search;
-mod sync;
-mod tags;
-pub mod utils;
-pub mod volumes;
-mod web_api;
 
 // A version of [NodeConfig] that is safe to share with the frontend
 #[derive(Debug, Serialize, Deserialize, Clone, Type)]
@@ -75,9 +90,11 @@ pub struct SanitisedNodeConfig {
 	pub id: Uuid,
 	/// name is the display name of the current node. This is set by the user and is shown in the UI. // TODO: Length validation so it can fit in DNS record
 	pub name: String,
-	pub p2p_enabled: bool,
-	pub p2p_port: Option<u16>,
+	pub identity: RemoteIdentity,
+	pub p2p: NodeConfigP2P,
 	pub features: Vec<BackendFeature>,
+	pub preferences: NodePreferences,
+	pub image_labeler_version: Option<String>,
 }
 
 impl From<NodeConfig> for SanitisedNodeConfig {
@@ -85,9 +102,11 @@ impl From<NodeConfig> for SanitisedNodeConfig {
 		Self {
 			id: value.id,
 			name: value.name,
-			p2p_enabled: value.p2p.enabled,
-			p2p_port: value.p2p.port,
+			identity: value.identity.to_remote_identity(),
+			p2p: value.p2p,
 			features: value.features,
+			preferences: value.preferences,
+			image_labeler_version: value.image_labeler_version,
 		}
 	}
 }
@@ -97,7 +116,8 @@ struct NodeState {
 	#[serde(flatten)]
 	config: SanitisedNodeConfig,
 	data_path: String,
-	p2p: P2PStatus,
+	device_model: Option<String>,
+	is_in_docker: bool,
 }
 
 pub(crate) fn mount() -> Arc<Router> {
@@ -110,13 +130,19 @@ pub(crate) fn mount() -> Arc<Router> {
 				commit: &'static str,
 			}
 
-			R.query(|_, _: ()| BuildInfo {
-				version: env!("CARGO_PKG_VERSION"),
-				commit: env!("GIT_HASH"),
+			R.query(|_, _: ()| {
+				Ok(BuildInfo {
+					version: env!("CARGO_PKG_VERSION"),
+					commit: env!("GIT_HASH"),
+				})
 			})
 		})
 		.procedure("nodeState", {
 			R.query(|node, _: ()| async move {
+				let device_model = get_hardware_model_name()
+					.unwrap_or(HardwareModel::Other)
+					.to_string();
+
 				Ok(NodeState {
 					config: node.config.get().await.into(),
 					// We are taking the assumption here that this value is only used on the frontend for display purposes
@@ -126,7 +152,8 @@ pub(crate) fn mount() -> Arc<Router> {
 						.to_str()
 						.expect("Found non-UTF-8 path")
 						.to_string(),
-					p2p: node.p2p.manager.status(),
+					device_model: Some(device_model),
+					is_in_docker: is_in_docker(),
 				})
 			})
 		})
@@ -136,29 +163,24 @@ pub(crate) fn mount() -> Arc<Router> {
 
 				let enabled = if config.features.iter().contains(&feature) {
 					node.config
-						.write(|mut cfg| {
+						.write(|cfg| {
 							cfg.features.retain(|f| *f != feature);
 						})
 						.await
 						.map(|_| false)
 				} else {
 					node.config
-						.write(|mut cfg| {
+						.write(|cfg| {
 							cfg.features.push(feature.clone());
 						})
 						.await
 						.map(|_| true)
 				}
-				.map_err(|err| rspc::Error::new(ErrorCode::InternalServerError, err.to_string()))?;
+				.map_err(|e| rspc::Error::new(ErrorCode::InternalServerError, e.to_string()))?;
 
 				match feature {
-					BackendFeature::SyncEmitMessages => {
-						node.libraries
-							.emit_messages_flag
-							.store(enabled, Ordering::Relaxed);
-					}
-					BackendFeature::FilesOverP2P => {
-						node.files_over_p2p_flag.store(enabled, Ordering::Relaxed);
+					BackendFeature::CloudSync => {
+						node.cloud_sync_flag.store(enabled, Ordering::Relaxed);
 					}
 				}
 
@@ -169,10 +191,12 @@ pub(crate) fn mount() -> Arc<Router> {
 		})
 		.merge("api.", web_api::mount())
 		.merge("auth.", auth::mount())
+		.merge("cloud.", cloud::mount())
 		.merge("search.", search::mount())
 		.merge("library.", libraries::mount())
 		.merge("volumes.", volumes::mount())
 		.merge("tags.", tags::mount())
+		.merge("labels.", labels::mount())
 		// .merge("categories.", categories::mount())
 		// .merge("keys.", keys::mount())
 		.merge("locations.", locations::mount())
@@ -180,12 +204,25 @@ pub(crate) fn mount() -> Arc<Router> {
 		.merge("files.", files::mount())
 		.merge("jobs.", jobs::mount())
 		.merge("p2p.", p2p::mount())
+		.merge("models.", models::mount())
 		.merge("nodes.", nodes::mount())
 		.merge("sync.", sync::mount())
 		.merge("preferences.", preferences::mount())
 		.merge("notifications.", notifications::mount())
 		.merge("backups.", backups::mount())
 		.merge("invalidation.", utils::mount_invalidate())
+		.sd_patch_types_dangerously(|type_map| {
+			let def =
+				<sd_prisma::prisma::object::Data as specta::NamedType>::definition_named_data_type(
+					type_map,
+				);
+			type_map.insert(
+				<sd_prisma::prisma::object::Data as specta::NamedType>::sid(),
+				def,
+			);
+		});
+
+	let r = r
 		.build(
 			#[allow(clippy::let_and_return)]
 			{

@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{ffi::OsStr, fmt::Display, path::Path};
 
 /// The size of 1MiB in bytes
 const MIB: u64 = 1_048_576;
@@ -18,21 +18,24 @@ pub const GENERIC_EXTENSIONS: [&str; 17] = [
 pub const SVG_EXTENSIONS: [&str; 2] = ["svg", "svgz"];
 pub const PDF_EXTENSIONS: [&str; 1] = ["pdf"];
 #[cfg(feature = "heif")]
-pub const HEIF_EXTENSIONS: [&str; 7] = ["heif", "heifs", "heic", "heics", "avif", "avci", "avcs"];
+pub const HEIF_EXTENSIONS: [&str; 8] = [
+	"hif", "heif", "heifs", "heic", "heics", "avif", "avci", "avcs",
+];
 
 /// It is 512x512, but if the SVG has a non-1:1 aspect ratio we need to account for that.
 pub const SVG_TARGET_PX: f32 = 262_144_f32;
 /// The size that PDF pages are rendered at.
 ///
-/// This is 120 DPI at standard A4 printer paper size - the target aspect
+/// This is 96DPI at standard A4 printer paper size - the target aspect
 /// ratio and height are maintained.
-pub const PDF_RENDER_WIDTH: pdfium_render::prelude::Pixels = 992;
+pub const PDF_PORTRAIT_RENDER_WIDTH: pdfium_render::prelude::Pixels = 794;
+pub const PDF_LANDSCAPE_RENDER_WIDTH: pdfium_render::prelude::Pixels = 1123;
 
 #[cfg_attr(feature = "specta", derive(specta::Type))]
 #[cfg_attr(feature = "bincode", derive(bincode::Encode, bincode::Decode))]
 #[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
 #[derive(Debug, Clone, Copy)]
-pub enum ConvertableExtension {
+pub enum ConvertibleExtension {
 	Bmp,
 	Dib,
 	Ff,
@@ -49,6 +52,7 @@ pub enum ConvertableExtension {
 	Vst,
 	Tiff,
 	Tif,
+	Hif,
 	Heif,
 	Heifs,
 	Heic,
@@ -62,13 +66,27 @@ pub enum ConvertableExtension {
 	Webp,
 }
 
-impl Display for ConvertableExtension {
+impl ConvertibleExtension {
+	#[must_use]
+	pub const fn should_rotate(self) -> bool {
+		!matches!(
+			self,
+			Self::Hif
+				| Self::Heif | Self::Heifs
+				| Self::Heic | Self::Heics
+				| Self::Avif | Self::Avci
+				| Self::Avcs
+		)
+	}
+}
+
+impl Display for ConvertibleExtension {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		write!(f, "{self:?}")
 	}
 }
 
-impl TryFrom<String> for ConvertableExtension {
+impl TryFrom<String> for ConvertibleExtension {
 	type Error = crate::Error;
 
 	fn try_from(value: String) -> Result<Self, Self::Error> {
@@ -90,6 +108,7 @@ impl TryFrom<String> for ConvertableExtension {
 			"vst" => Ok(Self::Vst),
 			"tiff" => Ok(Self::Tiff),
 			"tif" => Ok(Self::Tif),
+			"hif" => Ok(Self::Hif),
 			"heif" => Ok(Self::Heif),
 			"heifs" => Ok(Self::Heifs),
 			"heic" => Ok(Self::Heic),
@@ -106,8 +125,20 @@ impl TryFrom<String> for ConvertableExtension {
 	}
 }
 
+impl TryFrom<&Path> for ConvertibleExtension {
+	type Error = crate::Error;
+
+	fn try_from(value: &Path) -> Result<Self, Self::Error> {
+		value
+			.extension()
+			.and_then(OsStr::to_str)
+			.map(str::to_string)
+			.map_or_else(|| Err(crate::Error::Unsupported), Self::try_from)
+	}
+}
+
 #[cfg(feature = "serde")]
-impl serde::Serialize for ConvertableExtension {
+impl serde::Serialize for ConvertibleExtension {
 	fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
 	where
 		S: serde::Serializer,
@@ -121,7 +152,7 @@ struct ExtensionVisitor;
 
 #[cfg(feature = "serde")]
 impl<'de> serde::de::Visitor<'de> for ExtensionVisitor {
-	type Value = ConvertableExtension;
+	type Value = ConvertibleExtension;
 
 	fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		formatter.write_str("A valid extension string`")
@@ -136,7 +167,7 @@ impl<'de> serde::de::Visitor<'de> for ExtensionVisitor {
 }
 
 #[cfg(feature = "serde")]
-impl<'de> serde::Deserialize<'de> for ConvertableExtension {
+impl<'de> serde::Deserialize<'de> for ConvertibleExtension {
 	fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
 	where
 		D: serde::Deserializer<'de>,

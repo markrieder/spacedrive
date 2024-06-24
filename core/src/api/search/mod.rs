@@ -1,27 +1,31 @@
+use crate::{
+	api::{locations::ExplorerItem, utils::library},
+	library::Library,
+	location::{non_indexed, LocationError},
+	util::{unsafe_streamed_query, BatchedStream},
+};
+
+use prisma_client_rust::Operator;
+use sd_core_heavy_lifting::media_processor::ThumbKey;
+use sd_core_prisma_helpers::{file_path_for_frontend, object_with_file_paths, CasId};
+use sd_prisma::prisma::{self, PrismaClient};
+
+use std::path::PathBuf;
+
+use async_stream::stream;
+use futures::StreamExt;
+use itertools::Either;
+use rspc::{alpha::AlphaRouter, ErrorCode};
+use serde::{Deserialize, Serialize};
+use specta::Type;
+
+pub mod exif_data;
 pub mod file_path;
-pub mod media_data;
 pub mod object;
 pub mod saved;
 mod utils;
 
 pub use self::{file_path::*, object::*, utils::*};
-
-use crate::{
-	api::{
-		locations::{file_path_with_object, object_with_file_paths, ExplorerItem},
-		utils::library,
-	},
-	library::Library,
-	location::{non_indexed, LocationError},
-	object::media::thumbnail::get_indexed_thumb_key,
-};
-
-use std::path::PathBuf;
-
-use rspc::{alpha::AlphaRouter, ErrorCode};
-use sd_prisma::prisma::{self, PrismaClient};
-use serde::{Deserialize, Serialize};
-use specta::Type;
 
 use super::{Ctx, R};
 
@@ -33,7 +37,7 @@ struct SearchData<T> {
 	items: Vec<T>,
 }
 
-#[derive(Deserialize, Type, Debug, Clone)]
+#[derive(Serialize, Deserialize, Type, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub enum SearchFilterArgs {
 	FilePath(FilePathFilterArgs),
@@ -41,32 +45,17 @@ pub enum SearchFilterArgs {
 }
 
 impl SearchFilterArgs {
-	async fn into_params<T>(
+	async fn into_params(
 		self,
 		db: &PrismaClient,
-		file_path: fn(Vec<prisma::file_path::WhereParam>) -> Vec<T>,
-		object: fn(Vec<prisma::object::WhereParam>) -> Vec<T>,
-	) -> Result<Vec<T>, rspc::Error> {
-		Ok(match self {
-			Self::FilePath(v) => file_path(v.into_params(db).await?),
-			Self::Object(v) => object(v.into_params()),
-		})
-	}
-
-	async fn into_file_path_params(
-		self,
-		db: &PrismaClient,
-	) -> Result<Vec<prisma::file_path::WhereParam>, rspc::Error> {
-		self.into_params(db, |v| v, |v| vec![prisma::file_path::object::is(v)])
-			.await
-	}
-
-	async fn into_object_params(
-		self,
-		db: &PrismaClient,
-	) -> Result<Vec<prisma::object::WhereParam>, rspc::Error> {
-		self.into_params(db, |v| vec![prisma::object::file_paths::some(v)], |v| v)
-			.await
+		file_path: &mut Vec<prisma::file_path::WhereParam>,
+		object: &mut Vec<prisma::object::WhereParam>,
+	) -> Result<(), rspc::Error> {
+		match self {
+			Self::FilePath(v) => file_path.extend(v.into_params(db).await?),
+			Self::Object(v) => object.extend(v.into_params()),
+		};
+		Ok(())
 	}
 }
 
@@ -90,50 +79,78 @@ pub fn mount() -> AlphaRouter<Ctx> {
 				#[specta(optional)]
 				order: Option<EphemeralPathOrder>,
 			}
+			#[derive(Serialize, Type, Debug)]
+			struct EphemeralPathsResultItem {
+				pub entries: Vec<ExplorerItem>,
+				pub errors: Vec<rspc::Error>,
+			}
 
-			R.with2(library()).query(
+			R.with2(library()).subscription(
 				|(node, library),
 				 EphemeralPathSearchArgs {
 				     path,
 				     with_hidden_files,
 				     order,
 				 }| async move {
-					let mut paths =
-						non_indexed::walk(path, with_hidden_files, node, library).await?;
+					let paths =
+						non_indexed::walk(path, with_hidden_files, node, library, |entries| {
+							macro_rules! order_match {
+								($order:ident, [$(($variant:ident, |$i:ident| $func:expr)),+]) => {{
+									match $order {
+										$(EphemeralPathOrder::$variant(order) => {
+											entries.sort_unstable_by(|path1, path2| {
+												let func = |$i: &non_indexed::Entry| $func;
 
-					macro_rules! order_match {
-						($order:ident, [$(($variant:ident, |$i:ident| $func:expr)),+]) => {{
-							match $order {
-								$(EphemeralPathOrder::$variant(order) => {
-									paths.entries.sort_unstable_by(|path1, path2| {
-										let func = |$i: &ExplorerItem| $func;
+												let one = func(path1);
+												let two = func(path2);
 
-										let one = func(path1);
-										let two = func(path2);
-
-										match order {
-											SortOrder::Desc => two.cmp(&one),
-											SortOrder::Asc => one.cmp(&two),
-										}
-									});
-								})+
+												match order {
+													SortOrder::Desc => two.cmp(&one),
+													SortOrder::Asc => one.cmp(&two),
+												}
+											});
+										})+
+									}
+								}};
 							}
-						}};
-					}
 
-					if let Some(order) = order {
-						order_match!(
-							order,
-							[
-								(Name, |p| p.name().to_lowercase()),
-								(SizeInBytes, |p| p.size_in_bytes()),
-								(DateCreated, |p| p.date_created()),
-								(DateModified, |p| p.date_modified())
-							]
-						)
-					}
+							if let Some(order) = order {
+								order_match!(
+									order,
+									[
+										(Name, |p| p.name().to_lowercase()),
+										(SizeInBytes, |p| p.size_in_bytes()),
+										(DateCreated, |p| p.date_created()),
+										(DateModified, |p| p.date_modified())
+									]
+								)
+							}
+						})
+						.await?;
 
-					Ok(paths)
+					let mut stream = BatchedStream::new(paths);
+					Ok(unsafe_streamed_query(stream! {
+						while let Some(result) = stream.next().await {
+							// We optimize for the case of no errors because it should be way more common.
+							let mut entries = Vec::with_capacity(result.len());
+							let mut errors = Vec::with_capacity(0);
+
+							for item in result {
+								match item {
+									Ok(item) => entries.push(item),
+									Err(e) => match e {
+										Either::Left(e) => errors.push(e),
+										Either::Right(e) => errors.push(e.into()),
+									},
+								}
+							}
+
+							yield EphemeralPathsResultItem {
+								entries,
+								errors,
+							};
+						}
+					}))
 				},
 			)
 		})
@@ -165,15 +182,17 @@ pub fn mount() -> AlphaRouter<Ctx> {
 				 }| async move {
 					let Library { db, .. } = library.as_ref();
 
-					let mut query = db.file_path().find_many({
-						let mut params = Vec::new();
+					let params = {
+						let (mut fp, obj) = merge_filters(filters, db).await?;
 
-						for filter in filters {
-							params.extend(filter.into_file_path_params(db).await?);
+						if !obj.is_empty() {
+							fp.push(prisma::file_path::object::is(obj));
 						}
 
-						params
-					});
+						fp
+					};
+
+					let mut query = db.file_path().find_many(andify(params));
 
 					if let Some(take) = take {
 						query = query.take(take as i64);
@@ -191,29 +210,32 @@ pub fn mount() -> AlphaRouter<Ctx> {
 					}
 
 					let file_paths = query
-						.include(file_path_with_object::include())
+						.include(file_path_for_frontend::include())
 						.exec()
 						.await?;
 
 					let mut items = Vec::with_capacity(file_paths.len());
 
 					for file_path in file_paths {
-						let thumbnail_exists_locally = if let Some(cas_id) = &file_path.cas_id {
-							library
-								.thumbnail_exists(&node, cas_id)
-								.await
-								.map_err(LocationError::from)?
-						} else {
-							false
-						};
+						let has_created_thumbnail =
+							if let Some(cas_id) = file_path.cas_id.as_ref().map(CasId::from) {
+								library
+									.thumbnail_exists(&node, &cas_id)
+									.await
+									.map_err(LocationError::from)?
+							} else {
+								false
+							};
 
 						items.push(ExplorerItem::Path {
-							has_local_thumbnail: thumbnail_exists_locally,
-							thumbnail_key: file_path
+							thumbnail: file_path
 								.cas_id
 								.as_ref()
-								.map(|i| get_indexed_thumb_key(i, library.id)),
-							item: file_path,
+								.map(CasId::from)
+								.map(CasId::into_owned)
+								.map(|cas_id| ThumbKey::new_indexed(cas_id, library.id)),
+							has_created_thumbnail,
+							item: Box::new(file_path),
 						})
 					}
 
@@ -240,13 +262,13 @@ pub fn mount() -> AlphaRouter<Ctx> {
 					Ok(db
 						.file_path()
 						.count({
-							let mut params = Vec::new();
+							let (mut fp, obj) = merge_filters(filters, db).await?;
 
-							for filter in filters {
-								params.extend(filter.into_file_path_params(db).await?);
+							if !obj.is_empty() {
+								fp.push(prisma::file_path::object::is(obj));
 							}
 
-							params
+							fp
 						})
 						.exec()
 						.await? as u32)
@@ -277,13 +299,13 @@ pub fn mount() -> AlphaRouter<Ctx> {
 					let mut query = db
 						.object()
 						.find_many({
-							let mut params = Vec::new();
+							let (fp, mut obj) = merge_filters(filters, db).await?;
 
-							for filter in filters {
-								params.extend(filter.into_object_params(db).await?);
+							if !fp.is_empty() {
+								obj.push(prisma::object::file_paths::some(fp));
 							}
 
-							params
+							andify(obj)
 						})
 						.take(take as i64);
 
@@ -312,9 +334,11 @@ pub fn mount() -> AlphaRouter<Ctx> {
 							.file_paths
 							.iter()
 							.map(|fp| fp.cas_id.as_ref())
-							.find_map(|c| c);
+							.find_map(|c| c)
+							.map(CasId::from)
+							.map(|cas_id| cas_id.to_owned());
 
-						let thumbnail_exists_locally = if let Some(cas_id) = cas_id {
+						let has_created_thumbnail = if let Some(cas_id) = &cas_id {
 							library.thumbnail_exists(&node, cas_id).await.map_err(|e| {
 								rspc::Error::with_cause(
 									ErrorCode::InternalServerError,
@@ -327,9 +351,10 @@ pub fn mount() -> AlphaRouter<Ctx> {
 						};
 
 						items.push(ExplorerItem::Object {
-							has_local_thumbnail: thumbnail_exists_locally,
-							thumbnail_key: cas_id.map(|i| get_indexed_thumb_key(i, library.id)),
+							thumbnail: cas_id
+								.map(|cas_id| ThumbKey::new_indexed(cas_id, library.id)),
 							item: object,
+							has_created_thumbnail,
 						});
 					}
 
@@ -353,17 +378,47 @@ pub fn mount() -> AlphaRouter<Ctx> {
 					Ok(db
 						.object()
 						.count({
-							let mut params = Vec::new();
+							let (fp, mut obj) = merge_filters(filters, db).await?;
 
-							for filter in filters {
-								params.extend(filter.into_object_params(db).await?);
+							if !fp.is_empty() {
+								obj.push(prisma::object::file_paths::some(fp));
 							}
 
-							params
+							obj
 						})
 						.exec()
 						.await? as u32)
 				})
 		})
-	// .merge("saved.", saved::mount())
+		.merge("saved.", saved::mount())
+}
+
+async fn merge_filters(
+	filters: Vec<SearchFilterArgs>,
+	db: &PrismaClient,
+) -> Result<
+	(
+		Vec<prisma::file_path::WhereParam>,
+		Vec<prisma::object::WhereParam>,
+	),
+	rspc::Error,
+> {
+	let mut obj = vec![];
+	let mut fp = vec![];
+
+	for filter in filters {
+		filter.into_params(db, &mut fp, &mut obj).await?;
+	}
+
+	Ok((fp, obj))
+}
+
+/// PCR 0.6.x's AND does { AND: [{ ...}] } instead of { AND: [{ ... }, { ... }, { ... }] },
+/// this works around it.
+fn andify<T: From<Operator<T>>>(params: Vec<T>) -> Vec<T> {
+	params.into_iter().fold(vec![], |mut params, param| {
+		params.push(param);
+
+		vec![prisma_client_rust::operator::and(params)]
+	})
 }

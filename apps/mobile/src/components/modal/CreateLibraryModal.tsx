@@ -1,10 +1,10 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { forwardRef, useState } from 'react';
 import { Text, View } from 'react-native';
-import { useBridgeMutation, usePlausibleEvent } from '@sd/client';
-import { ModalInput } from '~/components/form/Input';
+import { insertLibrary, useBridgeMutation, usePlausibleEvent } from '@sd/client';
 import { Modal, ModalRef } from '~/components/layout/Modal';
 import { Button } from '~/components/primitive/Button';
+import { ModalInput } from '~/components/primitive/Input';
 import useForwardedRef from '~/hooks/useForwardedRef';
 import { tw } from '~/lib/tailwind';
 import { currentLibraryStore } from '~/utils/nav';
@@ -25,12 +25,7 @@ const CreateLibraryModal = forwardRef<ModalRef, unknown>((_, ref) => {
 				setLibName('');
 
 				// We do this instead of invalidating the query because it triggers a full app re-render??
-				queryClient.setQueryData(['library.list'], (libraries: any) => {
-					// The invalidation system beat us to it
-					if (libraries.find((l: any) => l.uuid === lib.uuid)) return libraries;
-
-					return [...(libraries || []), lib];
-				});
+				insertLibrary(queryClient, lib);
 
 				// Switch to the new library
 				currentLibraryStore.id = lib.uuid;

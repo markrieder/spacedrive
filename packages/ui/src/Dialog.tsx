@@ -2,7 +2,6 @@
 
 import * as RDialog from '@radix-ui/react-dialog';
 import { animated, useTransition } from '@react-spring/web';
-import { iconNames } from '@sd/assets/util';
 import clsx from 'clsx';
 import { ReactElement, ReactNode, useEffect } from 'react';
 import { FieldValues, UseFormHandleSubmit } from 'react-hook-form';
@@ -54,14 +53,16 @@ class DialogManager {
 		return this.state[id];
 	}
 
+	isAnyDialogOpen() {
+		return Object.values(this.state).some((s) => s.open);
+	}
+
 	remove(id: number) {
 		const state = this.getState(id);
 
 		if (!state) {
-			throw new Error(`Dialog ${id} not registered!`);
-		}
-
-		if (state.open === false) {
+			console.error(new Error(`Dialog ${id} not registered!`));
+		} else if (state.open === false) {
 			delete this.dialogs[id];
 			delete this.state[id];
 		}
@@ -118,12 +119,15 @@ export interface DialogProps<S extends FieldValues>
 	loading?: boolean;
 	trigger?: ReactNode;
 	ctaLabel?: string;
+	ctaSecondLabel?: string;
 	onSubmit?: ReturnType<UseFormHandleSubmit<S>>;
+	onSubmitSecond?: ReturnType<UseFormHandleSubmit<S>>;
 	children?: ReactNode;
 	ctaDanger?: boolean;
 	closeLabel?: string;
+	cancelLabel?: string;
 	cancelBtn?: boolean;
-	description?: string;
+	description?: ReactNode;
 	onCancelled?: boolean | (() => void);
 	submitDisabled?: boolean;
 	transformOrigin?: string;
@@ -133,18 +137,20 @@ export interface DialogProps<S extends FieldValues>
 	icon?: ReactNode; //an icon that is placed next to the title
 	formClassName?: string;
 	icon?: ReactNode;
+	hideButtons?: boolean;
+	ignoreClickOutside?: boolean;
 }
 
 export function Dialog<S extends FieldValues>({
 	form,
 	dialog,
 	onSubmit,
+	onSubmitSecond,
 	onCancelled = true,
 	invertButtonFocus,
 	...props
 }: DialogProps<S>) {
 	const stateSnap = useSnapshot(dialog.state);
-
 	const transitions = useTransition(stateSnap.open, {
 		from: {
 			opacity: 0,
@@ -165,7 +171,7 @@ export function Dialog<S extends FieldValues>({
 				variant="gray"
 				onClick={typeof onCancelled === 'function' ? onCancelled : undefined}
 			>
-				Cancel
+				{props.cancelLabel || 'Cancel'}
 			</Button>
 		</RDialog.Close>
 	);
@@ -184,12 +190,12 @@ export function Dialog<S extends FieldValues>({
 	);
 	const disableCheck = props.errorMessageException
 		? !form.formState.isValid &&
-		  !form.formState.errors.root?.serverError?.message?.startsWith(
+			!form.formState.errors.root?.serverError?.message?.startsWith(
 				props.errorMessageException as string
-		  )
+			)
 		: !form.formState.isValid;
 
-	const submitButton = (
+	const submitButton = !props.ctaSecondLabel ? (
 		<Button
 			type="submit"
 			size="sm"
@@ -199,9 +205,54 @@ export function Dialog<S extends FieldValues>({
 				props.ctaDanger &&
 					'border-red-500 bg-red-500 focus:ring-1 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-app-selected'
 			)}
+			onClick={async (e: React.MouseEvent<HTMLElement>) => {
+				e.preventDefault();
+				await onSubmit?.(e);
+				dialog.onSubmit?.();
+				setOpen(false);
+			}}
 		>
 			{props.ctaLabel}
 		</Button>
+	) : (
+		<div className="flex flex-row gap-x-2">
+			<Button
+				type="submit"
+				size="sm"
+				disabled={form.formState.isSubmitting || props.submitDisabled || disableCheck}
+				variant={props.ctaDanger ? 'colored' : 'accent'}
+				className={clsx(
+					props.ctaDanger &&
+						'border-red-500 bg-red-500 focus:ring-1 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-app-selected'
+				)}
+				onClick={async (e: React.MouseEvent<HTMLElement>) => {
+					e.preventDefault();
+					await onSubmit?.(e);
+					dialog.onSubmit?.();
+					setOpen(false);
+				}}
+			>
+				{props.ctaLabel}
+			</Button>
+			<Button
+				type="submit"
+				size="sm"
+				disabled={form.formState.isSubmitting || props.submitDisabled || disableCheck}
+				variant={props.ctaDanger ? 'colored' : 'accent'}
+				className={clsx(
+					props.ctaDanger &&
+						'border-primary-500 bg-primary-500 focus:ring-1 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-app-selected'
+				)}
+				onClick={async (e: React.MouseEvent<HTMLElement>) => {
+					e.preventDefault();
+					await onSubmitSecond?.(e);
+					dialog.onSubmit?.();
+					setOpen(false);
+				}}
+			>
+				{props.ctaSecondLabel}
+			</Button>
+		</div>
 	);
 
 	return (
@@ -211,7 +262,7 @@ export function Dialog<S extends FieldValues>({
 				show ? (
 					<RDialog.Portal forceMount>
 						<AnimatedDialogOverlay
-							className="z-49 fixed inset-0 m-[1px] grid place-items-center overflow-y-auto rounded-xl bg-app/50"
+							className="z-49 fixed inset-0 m-px grid place-items-center overflow-y-auto rounded-xl bg-app/50"
 							style={{
 								opacity: styles.opacity
 							}}
@@ -220,13 +271,14 @@ export function Dialog<S extends FieldValues>({
 						<AnimatedDialogContent
 							className="!pointer-events-none fixed inset-0 z-50 grid place-items-center overflow-y-auto"
 							style={styles}
+							onInteractOutside={(e) =>
+								props.ignoreClickOutside && e.preventDefault()
+							}
 						>
 							<Form
 								form={form}
 								onSubmit={async (e) => {
 									e?.preventDefault();
-									await onSubmit?.(e);
-									dialog.onSubmit?.();
 									setOpen(false);
 								}}
 								className={clsx(
@@ -251,7 +303,7 @@ export function Dialog<S extends FieldValues>({
 								</div>
 								<div
 									className={clsx(
-										'flex justify-end space-x-2 border-t border-app-line bg-app-input/60 p-3'
+										'flex items-center justify-end space-x-2 border-t border-app-line bg-app-input/60 p-3'
 									)}
 								>
 									{form.formState.isSubmitting && <Loader />}
@@ -259,26 +311,30 @@ export function Dialog<S extends FieldValues>({
 										<div>{props.buttonsSideContent}</div>
 									)}
 									<div className="grow" />
-									<div
-										className={clsx(
-											invertButtonFocus ? 'flex-row-reverse' : ' flex-row',
-											'flex gap-2'
-										)}
-									>
-										{invertButtonFocus ? (
-											<>
-												{submitButton}
-												{props.cancelBtn && cancelButton}
-												{onCancelled && closeButton}
-											</>
-										) : (
-											<>
-												{onCancelled && closeButton}
-												{props.cancelBtn && cancelButton}
-												{submitButton}
-											</>
-										)}
-									</div>
+									{!props.hideButtons && (
+										<div
+											className={clsx(
+												invertButtonFocus
+													? 'flex-row-reverse'
+													: ' flex-row',
+												'flex gap-2'
+											)}
+										>
+											{invertButtonFocus ? (
+												<>
+													{submitButton}
+													{props.cancelBtn && cancelButton}
+													{onCancelled && closeButton}
+												</>
+											) : (
+												<>
+													{onCancelled && closeButton}
+													{props.cancelBtn && cancelButton}
+													{submitButton}
+												</>
+											)}
+										</div>
+									)}
 								</div>
 							</Form>
 							<Remover id={dialog.id} />

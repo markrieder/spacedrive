@@ -1,111 +1,113 @@
+import { ObjectOrder, objectOrderingKeysSchema, Tag, useLibraryQuery } from '@sd/client';
 import { useCallback, useMemo } from 'react';
-import { ObjectKindEnum, ObjectOrder, Tag, useLibraryContext, useLibraryQuery } from '@sd/client';
 import { LocationIdParamsSchema } from '~/app/route-schemas';
 import { Icon } from '~/components';
-import { useRouteTitle, useZodRouteParams } from '~/hooks';
+import { useLocale, useRouteTitle, useZodRouteParams } from '~/hooks';
+import { stringify } from '~/util/uuid';
 
 import Explorer from '../Explorer';
 import { ExplorerContextProvider } from '../Explorer/Context';
-import { useObjectsInfiniteQuery } from '../Explorer/queries';
-import { useSearchFilters } from '../Explorer/Search/store';
-import { createDefaultExplorerSettings, objectOrderingKeysSchema } from '../Explorer/store';
+import { createDefaultExplorerSettings } from '../Explorer/store';
 import { DefaultTopBarOptions } from '../Explorer/TopBarOptions';
-import { useExplorer, UseExplorerSettings, useExplorerSettings } from '../Explorer/useExplorer';
-import { EmptyNotice } from '../Explorer/View';
+import { useExplorer, useExplorerSettings } from '../Explorer/useExplorer';
+import { useExplorerPreferences } from '../Explorer/useExplorerPreferences';
+import { EmptyNotice } from '../Explorer/View/EmptyNotice';
+import { SearchContextProvider, SearchOptions, useSearchFromSearchParams } from '../search';
+import SearchBar from '../search/SearchBar';
+import { useSearchExplorerQuery } from '../search/useSearchExplorerQuery';
 import { TopBarPortal } from '../TopBar/Portal';
 
 export function Component() {
 	const { id: tagId } = useZodRouteParams(LocationIdParamsSchema);
-	const tag = useLibraryQuery(['tags.get', tagId], { suspense: true });
+	const result = useLibraryQuery(['tags.get', tagId], { suspense: true });
+	const tag = result.data!;
 
-	useRouteTitle(tag.data?.name ?? 'Tag');
+	const { t } = useLocale();
 
-	const explorerSettings = useExplorerSettings({
-		settings: useMemo(
-			() =>
-				createDefaultExplorerSettings<ObjectOrder>({
-					order: null
-				}),
-			[]
-		),
-		orderingKeys: objectOrderingKeysSchema
-	});
+	useRouteTitle(tag!.name ?? 'Tag');
 
-	const { items, count, loadMore, query } = useItems({
-		tag: tag.data!,
-		settings: explorerSettings
+	const { explorerSettings, preferences } = useTagExplorerSettings(tag!);
+
+	const search = useSearchFromSearchParams({ defaultTarget: 'objects' });
+
+	const defaultFilters = useMemo(() => [{ object: { tags: { in: [tag.id] } } }], [tag.id]);
+
+	const items = useSearchExplorerQuery({
+		search,
+		explorerSettings,
+		filters: search.allFilters.length > 0 ? search.allFilters : defaultFilters,
+		take: 100,
+		objects: { order: explorerSettings.useSettingsSnapshot().order }
 	});
 
 	const explorer = useExplorer({
-		items,
-		count,
-		loadMore,
+		...items,
+		isFetchingNextPage: items.query.isFetchingNextPage,
+		isLoadingPreferences: preferences.isLoading,
 		settings: explorerSettings,
-		...(tag.data && {
-			parent: { type: 'Tag', tag: tag.data }
-		})
+		parent: { type: 'Tag', tag: tag }
 	});
 
 	return (
 		<ExplorerContextProvider explorer={explorer}>
-			<TopBarPortal
-				left={
-					<div className="flex flex-row items-center gap-2">
-						<div
-							className="h-[14px] w-[14px] shrink-0 rounded-full"
-							style={{ backgroundColor: tag?.data?.color || '#efefef' }}
+			<SearchContextProvider search={search}>
+				<TopBarPortal
+					center={<SearchBar defaultFilters={defaultFilters} defaultTarget="objects" />}
+					left={
+						<div className="flex flex-row items-center gap-2">
+							<div
+								className="size-[14px] shrink-0 rounded-full"
+								style={{ backgroundColor: tag!.color || '#efefef' }}
+							/>
+							<span className="truncate text-sm font-medium">{tag?.name}</span>
+						</div>
+					}
+					right={<DefaultTopBarOptions />}
+				>
+					{search.open && (
+						<>
+							<hr className="w-full border-t border-sidebar-divider bg-sidebar-divider" />
+							<SearchOptions />
+						</>
+					)}
+				</TopBarPortal>
+			</SearchContextProvider>
+
+			{!preferences.isLoading && (
+				<Explorer
+					emptyNotice={
+						<EmptyNotice
+							icon={<Icon name="Tags" size={128} />}
+							message={t('tags_notice_message')}
 						/>
-						<span className="truncate text-sm font-medium">{tag?.data?.name}</span>
-					</div>
-				}
-				right={<DefaultTopBarOptions />}
-			/>
-			<Explorer
-				showFilterBar
-				emptyNotice={
-					<EmptyNotice
-						loading={query.isFetching}
-						icon={<Icon name="Tags" size={128} />}
-						message="No items assigned to this tag."
-					/>
-				}
-			/>
+					}
+				/>
+			)}
 		</ExplorerContextProvider>
 	);
 }
 
-function useItems({ tag, settings }: { tag: Tag; settings: UseExplorerSettings<ObjectOrder> }) {
-	const { library } = useLibraryContext();
-
-	const explorerSettings = settings.useSettingsSnapshot();
-
-	const fixedFilters = useMemo(
-		() => [
-			{ object: { tags: { in: [tag.id] } } },
-			...(explorerSettings.layoutMode === 'media'
-				? [{ object: { kind: { in: [ObjectKindEnum.Image, ObjectKindEnum.Video] } } }]
-				: [])
-		],
-		[tag.id, explorerSettings.layoutMode]
-	);
-
-	const filters = useSearchFilters('objects', fixedFilters);
-
-	const count = useLibraryQuery(['search.objectsCount', { filters }]);
-
-	const query = useObjectsInfiniteQuery({
-		library,
-		arg: { take: 100, filters },
-		settings
+function useTagExplorerSettings(tag: Tag) {
+	const preferences = useExplorerPreferences({
+		data: tag,
+		createDefaultSettings: useCallback(
+			() => createDefaultExplorerSettings<ObjectOrder>({ order: null }),
+			[]
+		),
+		getSettings: useCallback(
+			(prefs) => prefs.tag?.[stringify(tag.pub_id)]?.explorer,
+			[tag.pub_id]
+		),
+		writeSettings: (settings) => ({
+			tag: { [stringify(tag.pub_id)]: { explorer: settings } }
+		})
 	});
 
-	const items = useMemo(() => query.data?.pages?.flatMap((d) => d.items) ?? null, [query.data]);
-
-	const loadMore = useCallback(() => {
-		if (query.hasNextPage && !query.isFetchingNextPage) {
-			query.fetchNextPage.call(undefined);
-		}
-	}, [query.hasNextPage, query.isFetchingNextPage, query.fetchNextPage]);
-
-	return { query, items, loadMore, count: count.data };
+	return {
+		preferences,
+		explorerSettings: useExplorerSettings({
+			...preferences.explorerSettingsProps,
+			orderingKeys: objectOrderingKeysSchema
+		})
+	};
 }

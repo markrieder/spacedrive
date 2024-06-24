@@ -4,6 +4,19 @@ import {
 	NavigationContainer,
 	useNavigationContainerRef
 } from '@react-navigation/native';
+import {
+	ClientContextProvider,
+	LibraryContextProvider,
+	P2PContextProvider,
+	RspcProvider,
+	initPlausible,
+	useBridgeQuery,
+	useClientContext,
+	useInvalidateQuery,
+	usePlausibleEvent,
+	usePlausiblePageViewMonitor,
+	usePlausiblePingMonitor
+} from '@sd/client';
 import { QueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import advancedFormat from 'dayjs/plugin/advancedFormat';
@@ -12,32 +25,22 @@ import relativeTime from 'dayjs/plugin/relativeTime';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
+import { LogBox } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { MenuProvider } from 'react-native-popup-menu';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useSnapshot } from 'valtio';
-import {
-	ClientContextProvider,
-	initPlausible,
-	LibraryContextProvider,
-	NotificationContextProvider,
-	P2PContextProvider,
-	RspcProvider,
-	useBridgeQuery,
-	useClientContext,
-	useInvalidateQuery,
-	usePlausibleEvent,
-	usePlausiblePageViewMonitor,
-	usePlausiblePingMonitor
-} from '@sd/client';
 
 import { GlobalModals } from './components/modal/GlobalModals';
+import { Toast, toastConfig } from './components/primitive/Toast';
 import { useTheme } from './hooks/useTheme';
 import { changeTwTheme, tw } from './lib/tailwind';
 import RootNavigator from './navigation';
 import OnboardingNavigator from './navigation/OnboardingNavigator';
-import { P2P } from './screens/p2p';
+import { P2P } from './screens/p2p/P2P';
 import { currentLibraryStore } from './utils/nav';
+
+LogBox.ignoreLogs(['Sending `onAnimatedValueUpdate` with no listeners registered.']);
 
 dayjs.extend(advancedFormat);
 dayjs.extend(relativeTime);
@@ -52,34 +55,33 @@ function AppNavigation() {
 	const plausibleEvent = usePlausibleEvent();
 	const buildInfo = useBridgeQuery(['buildInfo']);
 
-	initPlausible({ platformType: 'mobile', buildInfo: buildInfo?.data });
-
-	// TODO: Make sure library has actually been loaded by this point - precache with useCachedLibraries?
-	// if (library === undefined) throw new Error("Tried to render AppNavigation before libraries fetched!")
-
 	const navRef = useNavigationContainerRef();
 	const routeNameRef = useRef<string>();
 
 	const [currentPath, setCurrentPath] = useState<string>('/');
+
+	useEffect(() => {
+		if (buildInfo?.data) {
+			initPlausible({ platformType: 'mobile', buildInfo: buildInfo.data });
+		}
+	}, [buildInfo]);
 
 	usePlausiblePageViewMonitor({ currentPath });
 	usePlausiblePingMonitor({ currentPath });
 
 	useEffect(() => {
 		const interval = setInterval(() => {
-			plausibleEvent({
-				event: {
-					type: 'ping'
-				}
-			});
+			plausibleEvent({ event: { type: 'ping' } });
 		}, 270 * 1000);
 
 		return () => clearInterval(interval);
 	}, [plausibleEvent]);
 
-	if (library === null && libraries.data) {
-		currentLibraryStore.id = libraries.data[0]?.uuid ?? null;
-	}
+	useEffect(() => {
+		if (library === null && libraries.data) {
+			currentLibraryStore.id = libraries.data[0]?.uuid ?? null;
+		}
+	}, [library, libraries]);
 
 	return (
 		<NavigationContainer
@@ -92,7 +94,7 @@ function AppNavigation() {
 				colors: {
 					...DefaultTheme.colors,
 					// Default screen background
-					background: tw.color('app')!
+					background: 'black'
 				}
 			}}
 			onStateChange={async () => {
@@ -128,7 +130,7 @@ function AppContainer() {
 	const { id } = useSnapshot(currentLibraryStore);
 
 	return (
-		<SafeAreaProvider style={tw`flex-1 bg-app`}>
+		<SafeAreaProvider style={tw`flex-1 bg-black`}>
 			<GestureHandlerRootView style={tw`flex-1`}>
 				<MenuProvider>
 					<BottomSheetModalProvider>
@@ -136,9 +138,8 @@ function AppContainer() {
 						<ClientContextProvider currentLibraryId={id}>
 							<P2PContextProvider>
 								<P2P />
-								<NotificationContextProvider>
-									<AppNavigation />
-								</NotificationContextProvider>
+								<AppNavigation />
+								<Toast config={toastConfig} />
 							</P2PContextProvider>
 						</ClientContextProvider>
 					</BottomSheetModalProvider>

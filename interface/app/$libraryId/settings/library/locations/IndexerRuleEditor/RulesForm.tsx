@@ -13,6 +13,7 @@ import {
 } from '@sd/client';
 import { Button, Card, Divider, Input, Select, SelectOption, Tooltip } from '@sd/ui';
 import { ErrorMessage, Form, z } from '@sd/ui/src/forms';
+import { useLocale } from '~/hooks';
 
 import { InputKinds, RuleInput, validateInput } from './RuleInput';
 
@@ -20,7 +21,8 @@ const ruleKinds: UnionToTuple<RuleKind> = [
 	'AcceptFilesByGlob',
 	'RejectFilesByGlob',
 	'AcceptIfChildrenDirectoriesArePresent',
-	'RejectIfChildrenDirectoriesArePresent'
+	'RejectIfChildrenDirectoriesArePresent',
+    'IgnoredByGit'
 ];
 const ruleKindEnum = z.enum(ruleKinds);
 
@@ -46,9 +48,10 @@ const RulesForm = ({ onSubmitted }: Props) => {
 	const REMOTE_ERROR_FORM_FIELD = 'root.serverError';
 	const createIndexerRules = useLibraryMutation(['locations.indexer_rules.create']);
 	const formId = useId();
+	const { t } = useLocale();
 	const modeOptions: { value: RuleKind; label: string }[] = [
-		{ value: 'RejectFilesByGlob', label: 'Reject files' },
-		{ value: 'AcceptFilesByGlob', label: 'Accept files' }
+		{ value: 'RejectFilesByGlob', label: t('reject_files') },
+		{ value: 'AcceptFilesByGlob', label: t('accept_files') }
 	];
 	const form = useZodForm({
 		schema,
@@ -137,28 +140,28 @@ const RulesForm = ({ onSubmitted }: Props) => {
 				document.body
 			)}
 			<FormProvider {...form}>
-				<h3 className="mb-[15px] w-full text-sm font-semibold">Name</h3>
+				<h3 className="mb-[15px] w-full text-sm font-semibold">{t('name')}</h3>
 				<Input
 					className={errors.name && 'border border-red-500'}
 					form={formId}
 					size="md"
-					placeholder="Name"
+					placeholder={t('name')}
 					maxLength={18}
 					{...form.register('name')}
 				/>
 				{errors.name && <p className="mt-2 text-sm text-red-500">{errors.name?.message}</p>}
-				<h3 className="mb-[15px] mt-[20px] w-full text-sm font-semibold">Rules</h3>
+				<h3 className="mb-[15px] mt-[20px] w-full text-sm font-semibold">{t('rules')}</h3>
 				<div
 					className={
 						'grid space-y-1 rounded-md border border-app-line/60 bg-app-input p-2'
 					}
 				>
 					<div className="mb-2 grid w-full grid-cols-4 items-center pt-2 text-center text-[11px] font-bold">
-						<h3>Type</h3>
-						<h3>Value</h3>
+						<h3>{t('type')}</h3>
+						<h3>{t('value')}</h3>
 						<h3 className="flex items-center justify-center gap-1">
-							Mode
-							<Tooltip label="By default, an indexer rule functions as a Reject list, resulting in the exclusion of any files that match its criteria. Enabling this option will transform it into a Allow list, allowing the location to solely index files that meet its specified rules.">
+							{t('mode')}
+							<Tooltip label={t('indexer_rule_reject_allow_label')}>
 								<Info />
 							</Tooltip>
 						</h3>
@@ -183,7 +186,7 @@ const RulesForm = ({ onSubmitted }: Props) => {
 										>
 											{selectValues.map((value) => (
 												<SelectOption key={value} value={value}>
-													{value}
+													{t(`${value.toLowerCase()}`)}
 												</SelectOption>
 											))}
 										</Select>
@@ -249,11 +252,11 @@ const RulesForm = ({ onSubmitted }: Props) => {
 								/>
 								{index !== 0 && (
 									<Button
-										className="flex h-[32px] w-[32px] items-center justify-self-end"
+										className="flex size-[32px] items-center justify-self-end"
 										variant="gray"
 										onClick={() => remove(index)}
 									>
-										<Tooltip label="Delete rule">
+										<Tooltip label={t('delete_rule')}>
 											<Trash size={14} />
 										</Tooltip>
 									</Button>
@@ -281,7 +284,7 @@ const RulesForm = ({ onSubmitted }: Props) => {
 				</div>
 				<Divider className="my-[25px]" />
 				<Button form={formId} type="submit" variant="accent" className="mx-auto w-[90px]">
-					Save
+					{t('save')}
 				</Button>
 				<div className="text-center">
 					<ErrorMessage name={REMOTE_ERROR_FORM_FIELD} variant="large" className="mt-2" />

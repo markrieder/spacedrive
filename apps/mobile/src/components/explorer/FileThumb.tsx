@@ -1,22 +1,26 @@
+import { DocumentDirectoryPath } from '@dr.pogodin/react-native-fs';
 import { getIcon } from '@sd/assets/util';
+import { Image } from 'expo-image';
 import { useEffect, useLayoutEffect, useMemo, useState, type PropsWithChildren } from 'react';
-import { Image, View } from 'react-native';
-import { DocumentDirectoryPath } from 'react-native-fs';
+import { View } from 'react-native';
 import {
 	getExplorerItemData,
 	getItemFilePath,
 	getItemLocation,
 	isDarkTheme,
+	ThumbKey,
 	type ExplorerItem
 } from '@sd/client';
 import { flattenThumbnailKey, useExplorerStore } from '~/stores/explorerStore';
 
 import { tw } from '../../lib/tailwind';
 
-export const getThumbnailUrlByThumbKey = (thumbKey: string[]) =>
-	`${DocumentDirectoryPath}/thumbnails/${thumbKey
-		.map((i) => encodeURIComponent(i))
-		.join('/')}.webp`;
+// NOTE: `file://` is required for Android to load local files!
+export const getThumbnailUrlByThumbKey = (thumbKey: ThumbKey) => {
+	return `file://${DocumentDirectoryPath}/thumbnails/${encodeURIComponent(
+		thumbKey.base_directory_str
+	)}/${encodeURIComponent(thumbKey.shard_hex)}/${encodeURIComponent(thumbKey.cas_id)}.webp`;
+};
 
 const FileThumbWrapper = ({ children, size = 1 }: PropsWithChildren<{ size: number }>) => (
 	<View style={[tw`items-center justify-center`, { width: 80 * size, height: 80 * size }]}>
@@ -27,9 +31,13 @@ const FileThumbWrapper = ({ children, size = 1 }: PropsWithChildren<{ size: numb
 function useExplorerItemData(explorerItem: ExplorerItem) {
 	const explorerStore = useExplorerStore();
 
+	const firstThumbnail =
+		explorerItem.type === 'Label'
+			? explorerItem.thumbnails?.[0]
+			: 'thumbnail' in explorerItem && explorerItem.thumbnail;
+
 	const newThumbnail = !!(
-		explorerItem.thumbnail_key &&
-		explorerStore.newThumbnails.has(flattenThumbnailKey(explorerItem.thumbnail_key))
+		firstThumbnail && explorerStore.newThumbnails.has(flattenThumbnailKey(firstThumbnail))
 	);
 
 	return useMemo(() => {

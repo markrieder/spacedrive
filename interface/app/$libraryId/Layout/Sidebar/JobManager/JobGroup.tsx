@@ -10,11 +10,12 @@ import {
 	getTotalTasks,
 	JobGroup,
 	JobProgressEvent,
-	JobReport,
+	Report,
 	useLibraryMutation,
 	useTotalElapsedTimeText
 } from '@sd/client';
 import { Button, Dropdown, ProgressBar, toast, Tooltip } from '@sd/ui';
+import { useLocale } from '~/hooks';
 
 import Job from './Job';
 import JobContainer from './JobContainer';
@@ -40,6 +41,7 @@ export default function ({ group, progress }: JobGroupProps) {
 	}, [jobs]);
 
 	if (jobs.length === 0) return <></>;
+	const { t } = useLocale();
 
 	return (
 		<ul className="relative overflow-visible">
@@ -68,9 +70,7 @@ export default function ({ group, progress }: JobGroupProps) {
 						textItems={[
 							[
 								{
-									text: `${formatNumber(tasks.total)} ${
-										tasks.total <= 1 ? 'task' : 'tasks'
-									}`
+									text: `${formatNumber(tasks.total)} ${t('task', { count: tasks.total })}`
 								},
 								{ text: dateStarted },
 								{ text: totalGroupTime || undefined },
@@ -79,7 +79,7 @@ export default function ({ group, progress }: JobGroupProps) {
 									text: ['Queued', 'Paused', 'Canceled', 'Failed'].includes(
 										group.status
 									)
-										? group.status
+										? t(`${group.status.toLowerCase()}`)
 										: undefined
 								}
 							],
@@ -123,58 +123,60 @@ export default function ({ group, progress }: JobGroupProps) {
 	);
 }
 
+const toastErrorSuccess = (
+	errorMessage?: string,
+	successMessage?: string,
+	successCallBack?: () => void
+) => {
+	return {
+		onError: () => {
+			errorMessage &&
+				toast.error({
+					title: 'Error',
+					body: errorMessage
+				});
+		},
+		onSuccess: () => {
+			successMessage &&
+				toast.success({
+					title: 'Success',
+					body: successMessage
+				}),
+				successCallBack?.();
+		}
+	};
+};
+
 function Options({
 	activeJob,
 	group,
 	setShowChildJobs,
 	showChildJobs
 }: {
-	activeJob?: JobReport;
+	activeJob?: Report;
 	group: JobGroup;
 	setShowChildJobs: () => void;
 	showChildJobs: boolean;
 }) {
 	const queryClient = useQueryClient();
 
-	const toastErrorSuccess = (
-		errorMessage?: string,
-		successMessage?: string,
-		successCallBack?: () => void
-	) => {
-		return {
-			onError: () => {
-				errorMessage &&
-					toast.error({
-						title: 'Error',
-						body: errorMessage
-					});
-			},
-			onSuccess: () => {
-				successMessage &&
-					toast.success({
-						title: 'Success',
-						body: successMessage
-					}),
-					successCallBack?.();
-			}
-		};
-	};
+	const { t } = useLocale();
 
 	const resumeJob = useLibraryMutation(
 		['jobs.resume'],
-		toastErrorSuccess('Failed to resume job.', 'Job has been resumed.')
+		toastErrorSuccess(t('failed_to_resume_job'), t('job_has_been_resumed'))
 	);
 	const pauseJob = useLibraryMutation(
 		['jobs.pause'],
-		toastErrorSuccess('Failed to pause job.', 'Job has been paused.')
+		toastErrorSuccess(t('failed_to_pause_job'), t('job_has_been_paused'))
 	);
 	const cancelJob = useLibraryMutation(
 		['jobs.cancel'],
-		toastErrorSuccess('Failed to cancel job.', 'Job has been canceled.')
+		toastErrorSuccess(t('failed_to_cancel_job'), t('job_has_been_canceled'))
 	);
 	const clearJob = useLibraryMutation(
 		['jobs.clear'],
-		toastErrorSuccess('Failed to remove job.', undefined, () => {
+		toastErrorSuccess(t('failed_to_remove_job'), undefined, () => {
 			queryClient.invalidateQueries(['jobs.reports']);
 		})
 	);
@@ -184,7 +186,7 @@ function Options({
 			clearJob.mutate(job.id);
 			//only one toast for all jobs
 			if (job.id === group.id)
-				toast.success({ title: 'Success', body: 'Job has been removed.' });
+				toast.success({ title: t('success'), body: t('job_has_been_removed') });
 		});
 	};
 
@@ -199,12 +201,16 @@ function Options({
 			{(group.status === 'Queued' || group.status === 'Paused' || isJobPaused) && (
 				<Button
 					className="cursor-pointer"
-					onClick={() => resumeJob.mutate(group.id)}
+					onClick={() =>
+						resumeJob.mutate(
+							group.running_job_id != null ? group.running_job_id : group.id
+						)
+					}
 					size="icon"
 					variant="outline"
 				>
-					<Tooltip label="Resume">
-						<Play className="h-4 w-4 cursor-pointer" />
+					<Tooltip label={t('resume')}>
+						<Play className="size-4 cursor-pointer" />
 					</Tooltip>
 				</Button>
 			)}
@@ -213,9 +219,9 @@ function Options({
 					align="right"
 					itemsClassName="!bg-app-darkBox !border-app-box !top-[-8px]"
 					button={
-						<Tooltip label="Actions">
+						<Tooltip label={t('actions')}>
 							<Button className="!px-1" variant="outline">
-								<DotsThreeVertical className="h-4 w-4 cursor-pointer" />
+								<DotsThreeVertical className="size-4 cursor-pointer" />
 							</Button>
 						</Tooltip>
 					}
@@ -229,7 +235,7 @@ function Options({
 								iconClassName="!w-3"
 								className="!text-[11px] text-ink-dull"
 							>
-								Expand
+								{t('expand')}
 							</Dropdown.Item>
 						)}
 						<Dropdown.Item
@@ -238,35 +244,39 @@ function Options({
 							iconClassName="!w-3"
 							className="!text-[11px] text-ink-dull"
 						>
-							Remove
+							{t('remove')}
 						</Dropdown.Item>
 					</Dropdown.Section>
 				</Dropdown.Root>
 			) : (
 				<>
 					{/* Pause / Stop */}
-					<Tooltip label="Pause">
+					<Tooltip label={t('pause')}>
 						<Button
 							className="cursor-pointer"
-							onClick={() => {
-								pauseJob.mutate(group.id);
-							}}
+							onClick={() =>
+								pauseJob.mutate(
+									group.running_job_id != null ? group.running_job_id : group.id
+								)
+							}
 							size="icon"
 							variant="outline"
 						>
-							<Pause className="h-4 w-4 cursor-pointer" />
+							<Pause className="size-4 cursor-pointer" />
 						</Button>
 					</Tooltip>
-					<Tooltip label="Stop">
+					<Tooltip label={t('stop')}>
 						<Button
 							className="cursor-pointer"
 							onClick={() => {
-								cancelJob.mutate(group.id);
+								cancelJob.mutate(
+									group.running_job_id != null ? group.running_job_id : group.id
+								);
 							}}
 							size="icon"
 							variant="outline"
 						>
-							<Stop className="h-4 w-4 cursor-pointer" />
+							<Stop className="size-4 cursor-pointer" />
 						</Button>
 					</Tooltip>
 				</>

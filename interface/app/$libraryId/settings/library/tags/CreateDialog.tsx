@@ -2,12 +2,15 @@ import {
 	FilePath,
 	Object,
 	Target,
+	ToastDefautlColor,
 	useLibraryMutation,
 	usePlausibleEvent,
+	useRspcLibraryContext,
 	useZodForm
 } from '@sd/client';
-import { Dialog, InputField, useDialog, UseDialogProps, z } from '@sd/ui';
+import { Dialog, InputField, UseDialogProps, useDialog, z } from '@sd/ui';
 import { ColorPicker } from '~/components';
+import { useLocale } from '~/hooks';
 
 const schema = z.object({
 	name: z.string().trim().min(1).max(24),
@@ -20,14 +23,16 @@ export type AssignTagItems = Array<
 
 export function useAssignItemsToTag() {
 	const submitPlausibleEvent = usePlausibleEvent();
+	const rspc = useRspcLibraryContext();
 
 	const mutation = useLibraryMutation(['tags.assign'], {
 		onSuccess: () => {
 			submitPlausibleEvent({ event: { type: 'tagAssign' } });
+			rspc.queryClient.invalidateQueries(['search.paths']);
 		}
 	});
 
-	return (tagId: number, items: AssignTagItems, unassign: boolean) => {
+	return (tagId: number, items: AssignTagItems, unassign: boolean = false) => {
 		const targets = items.map<Target>((item) => {
 			if (item.type === 'Object') {
 				return { Object: item.item.id };
@@ -53,7 +58,7 @@ export default (
 
 	const form = useZodForm({
 		schema: schema,
-		defaultValues: { color: '#A717D9' }
+		defaultValues: { color: ToastDefautlColor }
 	});
 
 	const createTag = useLibraryMutation('tags.create');
@@ -72,20 +77,23 @@ export default (
 		}
 	});
 
+	const { t } = useLocale();
+
 	return (
 		<Dialog
 			invertButtonFocus
 			form={form}
 			onSubmit={onSubmit}
 			dialog={useDialog(props)}
-			title="Create New Tag"
-			description="Choose a name and color."
-			ctaLabel="Create"
+			title={t('create_new_tag')}
+			description={t('create_new_tag_description')}
+			ctaLabel={t('create')}
+			closeLabel={t('close')}
 		>
 			<div className="relative mt-3 ">
 				<InputField
 					{...form.register('name', { required: true })}
-					placeholder="Name"
+					placeholder={t('name')}
 					maxLength={24}
 					icon={<ColorPicker control={form.control} name="color" />}
 				/>

@@ -10,6 +10,9 @@ import Alias_Light from './Alias_Light.png';
 import Alias20 from './Alias-20.png';
 import Alias from './Alias.png';
 import AmazonS3 from './AmazonS3.png';
+import AndroidPhotos from './AndroidPhotos.png';
+import AppleFiles from './AppleFiles.png';
+import ApplePhotos from './ApplePhotos.png';
 import Application_Light from './Application_Light.png';
 import Application from './Application.png';
 import Archive_Light from './Archive_Light.png';
@@ -29,6 +32,8 @@ import Code20 from './Code-20.png';
 import Collection_Light from './Collection_Light.png';
 import Collection20 from './Collection-20.png';
 import Collection from './Collection.png';
+import CollectionSparkle_Light from './CollectionSparkle_Light.png';
+import CollectionSparkle from './CollectionSparkle.png';
 import Config20 from './Config-20.png';
 import Database_Light from './Database_Light.png';
 import Database20 from './Database-20.png';
@@ -42,6 +47,7 @@ import Document_pdf_Light from './Document_pdf_Light.png';
 import Document_pdf from './Document_pdf.png';
 import Document_xls_Light from './Document_xls_Light.png';
 import Document_xls from './Document_xls.png';
+import Document_xmp from './Document_xmp.png';
 import Document20 from './Document-20.png';
 import Document from './Document.png';
 import Dotfile20 from './Dotfile-20.png';
@@ -82,6 +88,7 @@ import Executable from './Executable.png';
 import Face_Light from './Face_Light.png';
 import Folder_Light from './Folder_Light.png';
 import Folder20 from './Folder-20.png';
+import Foldertagxmp from './Folder-tag-xmp.png';
 import Folder from './Folder.png';
 import FolderGrey_Light from './FolderGrey_Light.png';
 import FolderGrey from './FolderGrey.png';
@@ -113,14 +120,21 @@ import Laptop from './Laptop.png';
 import Link_Light from './Link_Light.png';
 import Link20 from './Link-20.png';
 import Link from './Link.png';
+import Location from './Location.png';
+import LocationManaged from './LocationManaged.png';
+import LocationReplica from './LocationReplica.png';
 import Lock_Light from './Lock_Light.png';
 import Lock from './Lock.png';
 import Mega from './Mega.png';
 import Mesh_Light from './Mesh_Light.png';
 import Mesh20 from './Mesh-20.png';
 import Mesh from './Mesh.png';
+import MiniSilverBox from './MiniSilverBox.png';
 import Mobile_Light from './Mobile_Light.png';
+import MobileAndroid from './Mobile-Android.png';
 import Mobile from './Mobile.png';
+import MoveLocation_Light from './MoveLocation_Light.png';
+import MoveLocation from './MoveLocation.png';
 import Movie_Light from './Movie_Light.png';
 import Movie from './Movie.png';
 import NewLocation from './NewLocation.png';
@@ -131,6 +145,7 @@ import OpenStack from './OpenStack.png';
 import Package_Light from './Package_Light.png';
 import Package20 from './Package-20.png';
 import Package from './Package.png';
+import PC from './PC.png';
 import PCloud from './PCloud.png';
 import Scrapbook_Light from './Scrapbook_Light.png';
 import Scrapbook from './Scrapbook.png';
@@ -140,8 +155,13 @@ import Screenshot from './Screenshot.png';
 import ScreenshotAlt from './ScreenshotAlt.png';
 import SD_Light from './SD_Light.png';
 import SD from './SD.png';
+import Search_Light from './Search_Light.png';
+import Search from './Search.png';
+import SearchAlt from './SearchAlt.png';
 import Server_Light from './Server_Light.png';
 import Server from './Server.png';
+import SilverBox from './SilverBox.png';
+import Spacedrop_Light from './Spacedrop_Light.png';
 import Spacedrop1 from './Spacedrop-1.png';
 import Spacedrop from './Spacedrop.png';
 import Tablet_Light from './Tablet_Light.png';
@@ -179,6 +199,9 @@ export {
 	Alias,
 	Alias_Light,
 	AmazonS3,
+	AndroidPhotos,
+	AppleFiles,
+	ApplePhotos,
 	Application,
 	Application_Light,
 	Archive20,
@@ -197,6 +220,8 @@ export {
 	Code20,
 	Collection20,
 	Collection,
+	CollectionSparkle,
+	CollectionSparkle_Light,
 	Collection_Light,
 	Config20,
 	DAV,
@@ -213,6 +238,7 @@ export {
 	Document_pdf_Light,
 	Document_xls,
 	Document_xls_Light,
+	Document_xmp,
 	Dotfile20,
 	DriveAmazonS3,
 	DriveAmazonS3_Light,
@@ -250,6 +276,7 @@ export {
 	Executable_old,
 	Face_Light,
 	Folder20,
+	Foldertagxmp,
 	Folder,
 	FolderGrey,
 	FolderGrey_Light,
@@ -282,14 +309,21 @@ export {
 	Link20,
 	Link,
 	Link_Light,
+	Location,
+	LocationManaged,
+	LocationReplica,
 	Lock,
 	Lock_Light,
 	Mega,
 	Mesh20,
 	Mesh,
 	Mesh_Light,
+	MiniSilverBox,
+	MobileAndroid,
 	Mobile,
 	Mobile_Light,
+	MoveLocation,
+	MoveLocation_Light,
 	Movie,
 	Movie_Light,
 	NewLocation,
@@ -297,6 +331,7 @@ export {
 	Node_Light,
 	OneDrive,
 	OpenStack,
+	PC,
 	PCloud,
 	Package20,
 	Package,
@@ -309,10 +344,15 @@ export {
 	Screenshot,
 	ScreenshotAlt,
 	Screenshot_Light,
+	Search,
+	SearchAlt,
+	Search_Light,
 	Server,
 	Server_Light,
+	SilverBox,
 	Spacedrop1,
 	Spacedrop,
+	Spacedrop_Light,
 	Tablet,
 	Tablet_Light,
 	Tags,

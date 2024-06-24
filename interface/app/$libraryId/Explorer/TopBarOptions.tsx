@@ -11,15 +11,15 @@ import {
 import clsx from 'clsx';
 import { useMemo } from 'react';
 import { useDocumentEventListener } from 'rooks';
-import { ExplorerLayout } from '@sd/client';
-import { toast } from '@sd/ui';
-import { useKeyMatcher } from '~/hooks';
+import { ExplorerLayout, useSelector } from '@sd/client';
+import { useKeyMatcher, useLocale } from '~/hooks';
 
 import { KeyManager } from '../KeyManager';
-import TopBarOptions, { ToolOption, TOP_BAR_ICON_STYLE } from '../TopBar/TopBarOptions';
+import { Spacedrop, SpacedropButton } from '../Spacedrop';
+import TopBarOptions, { ToolOption, TOP_BAR_ICON_CLASSLIST } from '../TopBar/TopBarOptions';
 import { useExplorerContext } from './Context';
 import OptionsPanel from './OptionsPanel';
-import { getExplorerStore, useExplorerStore } from './store';
+import { explorerStore } from './store';
 
 const layoutIcons: Record<ExplorerLayout, Icon> = {
 	grid: SquaresFour,
@@ -28,10 +28,15 @@ const layoutIcons: Record<ExplorerLayout, Icon> = {
 };
 
 export const useExplorerTopBarOptions = () => {
-	const explorerStore = useExplorerStore();
+	const [showInspector, tagAssignMode] = useSelector(explorerStore, (s) => [
+		s.showInspector,
+		s.isTagAssignModeActive
+	]);
 	const explorer = useExplorerContext();
 	const controlIcon = useKeyMatcher('Meta').icon;
 	const settings = explorer.useSettingsSnapshot();
+
+	const { t } = useLocale();
 
 	const viewOptions = useMemo(
 		() =>
@@ -43,8 +48,8 @@ export const useExplorerTopBarOptions = () => {
 
 					const option = {
 						layout,
-						toolTipLabel: `${layout} view`,
-						icon: <Icon className={TOP_BAR_ICON_STYLE} />,
+						toolTipLabel: t(`${layout}_view`),
+						icon: <Icon className={TOP_BAR_ICON_CLASSLIST} />,
 						keybinds: [controlIcon, (i + 1).toString()],
 						topBarActive:
 							!explorer.isLoadingPreferences && settings.layoutMode === layout,
@@ -61,33 +66,34 @@ export const useExplorerTopBarOptions = () => {
 			explorer.isLoadingPreferences,
 			explorer.layouts,
 			explorer.settingsStore,
-			settings.layoutMode
+			settings.layoutMode,
+			t
 		]
 	);
 
 	const controlOptions: ToolOption[] = [
 		{
-			toolTipLabel: 'Explorer display',
-			icon: <SlidersHorizontal className={TOP_BAR_ICON_STYLE} />,
+			toolTipLabel: t('explorer_settings'),
+			icon: <SlidersHorizontal className={TOP_BAR_ICON_CLASSLIST} />,
 			popOverComponent: <OptionsPanel />,
 			individual: true,
 			showAtResolution: 'sm:flex'
 		},
 		{
-			toolTipLabel: 'Show Inspector',
+			toolTipLabel: t('show_inspector'),
 			keybinds: [controlIcon, 'I'],
 			onClick: () => {
-				getExplorerStore().showInspector = !explorerStore.showInspector;
+				explorerStore.showInspector = !showInspector;
 			},
 			icon: (
 				<SidebarSimple
-					weight={explorerStore.showInspector ? 'fill' : 'regular'}
-					className={clsx(TOP_BAR_ICON_STYLE, 'scale-x-[-1]')}
+					weight={showInspector ? 'fill' : 'regular'}
+					className={clsx(TOP_BAR_ICON_CLASSLIST, '-scale-x-100')}
 				/>
 			),
 			individual: true,
 			showAtResolution: 'xl:flex',
-			topBarActive: explorerStore.showInspector
+			topBarActive: showInspector
 		}
 	];
 
@@ -106,28 +112,49 @@ export const useExplorerTopBarOptions = () => {
 
 	const toolOptions = [
 		{
+			toolTipLabel: 'Spacedrop',
+			icon: ({ triggerOpen }) => <SpacedropButton triggerOpen={triggerOpen} />,
+			popOverComponent: ({ triggerClose }) => <Spacedrop triggerClose={triggerClose} />,
+			individual: true,
+			showAtResolution: 'xl:flex'
+		},
+		{
 			toolTipLabel: 'Key Manager',
-			icon: <Key className={TOP_BAR_ICON_STYLE} />,
+			icon: <Key className={TOP_BAR_ICON_CLASSLIST} />,
 			popOverComponent: <KeyManager />,
 			individual: true,
 			showAtResolution: 'xl:flex'
 		},
 		{
-			toolTipLabel: 'Tag Assign Mode',
+			toolTipLabel: 'Assign tags',
 			icon: (
 				<Tag
-					weight={explorerStore.tagAssignMode ? 'fill' : 'regular'}
-					className={TOP_BAR_ICON_STYLE}
+					weight={tagAssignMode ? 'fill' : 'regular'}
+					className={TOP_BAR_ICON_CLASSLIST}
 				/>
 			),
 			// TODO: Assign tag mode is not yet implemented!
-			// onClick: () => (getExplorerStore().tagAssignMode = !explorerStore.tagAssignMode),
-			onClick: () => toast.info('Coming soon!'),
-			topBarActive: explorerStore.tagAssignMode,
+			onClick: () =>
+				(explorerStore.isTagAssignModeActive = !explorerStore.isTagAssignModeActive),
+			// TODO: remove once tag-assign-mode impl complete
+			// onClick: () => toast.info('Coming soon!'),
+			topBarActive: tagAssignMode,
 			individual: true,
 			showAtResolution: 'xl:flex'
 		}
-	].filter(Boolean) as ToolOption[];
+		// {
+		// 	toolTipLabel: 'Tag Assign Mode',
+		// 	icon: (
+		// 		<Tag weight={tagAssignMode ? 'fill' : 'regular'} className={TOP_BAR_ICON_STYLE} />
+		// 	),
+		// 	// TODO: Assign tag mode is not yet implemented!
+		// 	// onClick: () => (explorerStore.tagAssignMode = !explorerStore.tagAssignMode),
+		// 	onClick: () => toast.info(t('coming_soon)),
+		// 	topBarActive: tagAssignMode,
+		// 	individual: true,
+		// 	showAtResolution: 'xl:flex'
+		// }
+	] satisfies ToolOption[];
 
 	return {
 		viewOptions,

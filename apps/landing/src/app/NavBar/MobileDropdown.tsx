@@ -19,15 +19,11 @@ export function MobileDropdown() {
 	return (
 		<Dropdown.Root
 			button={
-				<Button
-					aria-label="mobile-menu"
-					className="ml-[140px] hover:!bg-transparent"
-					size="icon"
-				>
-					<DotsThreeVertical weight="bold" className="h-6 w-6 " />
+				<Button aria-label="mobile-menu" className="hover:!bg-transparent" size="icon">
+					<DotsThreeVertical weight="bold" className="size-6 " />
 				</Button>
 			}
-			className="right-4 top-2 block h-6 w-44 text-white lg:hidden"
+			className="right-4 top-2 block text-white lg:hidden"
 			itemsClassName="!rounded-2xl shadow-2xl shadow-black p-2 !bg-gray-850 mt-2 !border-gray-500 text-[15px]"
 		>
 			<Dropdown.Section>

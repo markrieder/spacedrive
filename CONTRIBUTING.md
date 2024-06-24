@@ -39,21 +39,31 @@ To make changes locally, follow these steps:
 
 1. Clone the repository: `git clone https://github.com/spacedriveapp/spacedrive`
 2. Navigate to the project directory: `cd spacedrive`
-3. For Linux or MacOS users, run: `./scripts/setup.sh`
-   - This will install FFmpeg and any other required dependencies for Spacedrive to build.
-4. For Windows users, run the following command in PowerShell: `.\scripts\setup.ps1`
-   - This will install pnpm, LLVM, FFmpeg, and any other required dependencies for Spacedrive to build.
-5. Install dependencies: `pnpm i`
-6. Prepare the build: `pnpm prep` (This will run all necessary codegen and build required dependencies)
+3. Configure your system environment for Spacedrive development
+   1. For Linux users, run: `./scripts/setup.sh`
+      > This [script](https://github.com/spacedriveapp/spacedrive/blob/main/scripts/setup.sh#L133) will check if Rust and pnpm are installed then proceed to install Clang, NASM, LLVM, libvips, Gstreamer's Plugins, FFmpeg, Perl, [Tauri essentials](https://tauri.app/v1/guides/getting-started/prerequisites/#setting-up-linux) and any other required dependencies for Spacedrive to build.
+   2. For macOS users, run: `./scripts/setup.sh`
+      > This [script](https://github.com/spacedriveapp/spacedrive/blob/main/scripts/setup.sh#L108) will check if Rust, pnpm and Xcode are installed and proceed to use Homebrew to install NASM, [Tauri essentials](https://tauri.app/v1/guides/getting-started/prerequisites/#setting-up-macos) and install any other required dependencies for Spacedrive to build.
+   3. For Windows users, run in PowerShell: `.\scripts\setup.ps1`
+      > This [script](https://github.com/spacedriveapp/spacedrive/blob/main/scripts/setup.ps1#L81) will install pnpm, LLVM, FFmpeg, C++ build tools, NASM, Rust + Cargo, Rust tools, Edge Webview 2, Strawberry Perl, [Tauri essentials](https://tauri.app/v1/guides/getting-started/prerequisites/#setting-up-windows) and any other required dependencies for Spacedrive to build.
+4. Install dependencies: `pnpm i`
+5. Prepare the build: `pnpm prep` (This will run all necessary codegen and build required dependencies)
 
 To quickly run only the desktop app after `prep`, you can use:
 
 - `pnpm tauri dev`
 
-  If necessary, the [webview devtools](https://tauri.app/v1/guides/debugging/application/#webview-console) can be opened by pressing `Ctrl + Shift + I` (Linux and Windows) and `Command + Option + I` (Mac) in the desktop app.
+  If necessary, the [webview devtools](https://tauri.app/v1/guides/debugging/application/#webview-console) can be opened by pressing `Ctrl + Shift + I` (Linux and Windows) or `Command + Option + I` (macOS) in the desktop app.
 
   Also, the react-devtools can be launched using `pnpm dlx react-devtools`.
-  However, it must be executed before starting the desktop app for it qto connect.
+  However, it must be executed before starting the desktop app for it to connect.
+
+You can download a bundle with sample files to test the app by running:
+
+- `pnpm test-data`
+
+  Only for Linux and macOS (Requires curl and tar).
+  The test files will be located in a directory called `test-data` in the root of the spacedrive repo.
 
 To run the web app:
 
@@ -65,32 +75,52 @@ You can launch these individually if you'd prefer:
 - `cargo run -p sd-server` (server)
 - `pnpm web dev` (web interface)
 
+To run the e2e tests for the web app:
+
+- `pnpm web test:e2e`
+
+If you are developing a new test, you can execute Cypress in interactive mode with:
+
+- `pnpm web test:interactive`
+
 To run the landing page:
 
 - `pnpm landing dev`
 
 If you encounter any issues, ensure that you are using the following versions of Rust, Node and Pnpm:
 
-- Rust version: **1.73.0**
-- Node version: **18.17**
-- Pnpm version: **8.0.0**
+- Rust version: **1.78**
+- Node version: **18.18**
+- Pnpm version: **9.1.1**
 
 After cleaning out your build artifacts using `pnpm clean`, `git clean`, or `cargo clean`, it is necessary to re-run the `setup-system` script.
 
 Make sure to read the [guidelines](https://spacedrive.com/docs/developers/prerequisites/guidelines) to ensure that your code follows a similar style to ours.
 
+After you finish making your changes and committed them to your branch, make sure to execute `pnpm autoformat` to fix any style inconsistency in your code.
+
 ##### Mobile App
 
 To run the mobile app:
 
+- Install Java JDK <= 17 for Android
+  - Java 21 is not compatible: https://github.com/react-native-async-storage/async-storage/issues/1057#issuecomment-1925963956
 - Install [Android Studio](https://developer.android.com/studio) for Android and [Xcode](https://apps.apple.com/au/app/xcode/id497799835) for iOS development.
 - Run `./scripts/setup.sh mobile`
   - This will set up most of the dependencies required to build the mobile app.
-- Make sure you have [NDK 23.1.7779620 and CMake](https://developer.android.com/studio/projects/install-ndk#default-version) installed in Android Studio.
+- Make sure you have [NDK 26.1.10909125 and CMake](https://developer.android.com/studio/projects/install-ndk#default-version) installed in Android Studio.
 - Run the following commands:
-  - `pnpm android` (runs on Android Emulator)
-  - `pnpm ios` (runs on iOS Emulator)
-  - `pnpm start` (runs the metro bundler)
+  - `pnpm mobile android` (runs on Android Emulator)
+    - In order to have locations working on Android, you must run the following command once the application has been installed for the first time. Otherwise, locations will not work.
+      - `adb shell appops set --uid com.spacedrive.app MANAGE_EXTERNAL_STORAGE allow`
+    - Run the following commands to access the logs from `sd-core`.
+      - `adb shell`
+      - Then `run-as com.spacedrive.app` to access the app's directory on device.
+      - Run `cd files/logs` and then select the logs with the timestamp of when you ran the app. Ex: `sd.log.2023-11-28`.
+        - You can view the logs using `tail -f [log-name]`. Ex: `tail -f sd.log.2023-11-28`.
+  - `pnpm mobile ios` (runs on iOS Emulator)
+    - `xcrun simctl launch --console booted com.spacedrive.app` allows you to view the console output of the iOS app from `tracing`. However, the application must be built in `debug` mode for this.
+  - `pnpm mobile start` (runs the metro bundler only)
 
 ### Pull Request
 
@@ -118,7 +148,7 @@ This error occurs when Xcode is not installed or when the Xcode command line too
 
 To resolve this issue:
 
-- Install Xcode from the Mac App Store.
+- Install Xcode from the macOS App Store or directly from [here](https://xcodereleases.com/) (requires Apple Account).
 - Run `xcode-select -s /Applications/Xcode.app/Contents/Developer`.
   This command will use Xcode's developer tools instead of macOS's default tools.
 
@@ -131,11 +161,15 @@ error: terminated(1): /us/bin/xcrun --sdk macos --show-sdk-platform-path output 
 xcrun: error: unable to lookup item 'PlatformPath' from command line tools installation xcrun: error: unable to lookup item 'PlatformPath' in SDK '/Library/Developer /CommandLineTools/SDKs/MacOSX.sdk'
 ```
 
-Ensure that MacOS is fully updated, and that you have XCode installed (via the app store).
+Ensure that macOS is fully updated, and that you have Xcode installed (via the app store).
 
-Once that has completed, run `xcode-select --install` in the terminal to install the command line tools. If they are already installed, ensure that you update MacOS to the latest version available.
+Once that has completed, run `xcode-select --install` in the terminal to install the command line tools. If they are already installed, ensure that you update macOS to the latest version available.
 
 Also ensure that Rosetta is installed, as a few of our dependencies require it. You can install Rosetta with `softwareupdate --install-rosetta --agree-to-license`.
+
+### Translations
+
+Check out the [i18n README](interface/locales/README.md) for more information on how to contribute to translations.
 
 ### Credits
 
