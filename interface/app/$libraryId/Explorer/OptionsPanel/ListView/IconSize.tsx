@@ -1,4 +1,3 @@
-import { useMemo } from 'react';
 import { Slider } from '@sd/ui';
 import { useLocale } from '~/hooks';
 
@@ -15,21 +14,18 @@ export const IconSize = () => {
 	const explorer = useExplorerContext();
 	const settings = explorer.useSettingsSnapshot();
 
-	const defaultValue = useMemo(
-		() => sizes.findIndex((size) => size[0] === settings.listViewIconSize),
-		[settings.listViewIconSize]
-	);
+	const defaultValue = sizes.indexMap.get(settings.listViewIconSize)!;
 
 	return (
 		<div>
 			<Subheading>{t('icon_size')}</Subheading>
 			<Slider
 				step={1}
-				max={sizes.length - 1}
+				max={sizes.indexMap.size - 1}
 				defaultValue={[defaultValue]}
 				onValueChange={([value]) => {
-					const size = value !== undefined && sizes[value];
-					if (size) explorer.settingsStore.listViewIconSize = size[0];
+					const size = value !== undefined && sizes.sizeMap.get(value);
+					if (size) explorer.settingsStore.listViewIconSize = size;
 				}}
 			/>
 		</div>

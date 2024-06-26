@@ -57,7 +57,8 @@ export function usePathsOffsetInfiniteQuery({
 			if (nodes.length >= arg.take) return (offset ?? 0) + 1;
 		},
 		onSuccess,
-		...args
+		...args,
+		suspense: true
 	});
 
 	const nodes = useMemo(

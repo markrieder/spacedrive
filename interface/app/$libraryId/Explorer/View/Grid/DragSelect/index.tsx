@@ -130,11 +130,11 @@ export const DragSelect = ({ grid, children, onActiveItemChange }: Props) => {
 			};
 
 			if (!continueSelection) {
-				if (explorer.selectedItems.has(item.data)) {
+				if (explorerView.selectedItems.has(item.data)) {
 					// Keep previous selection as selecto will reset it otherwise
 					selecto.current?.setSelectedTargets(e.beforeSelected);
 				} else {
-					explorer.resetSelectedItems([item.data]);
+					explorerView.resetSelectedItems([item.data]);
 					selectedTargets.resetSelectedTargets([
 						{ id: String(item.id), node: element as HTMLElement }
 					]);
@@ -143,8 +143,8 @@ export const DragSelect = ({ grid, children, onActiveItemChange }: Props) => {
 				return;
 			}
 
-			if (e.added[0]) explorer.addSelectedItem(item.data);
-			else explorer.removeSelectedItem(item.data);
+			if (e.added[0]) explorerView.addSelectedItem(item.data);
+			else explorerView.removeSelectedItem(item.data);
 
 			// Update active item for further keyboard selection.
 			onActiveItemChange(item.data, { updateFirstItem: true, setFirstItemAsChanged: true });

@@ -250,7 +250,7 @@ export type EphemeralRenameOne = { from_path: string; to: string }
 
 export type ExplorerItem = { type: "Path"; thumbnail: string[] | null; item: FilePathWithObject } | { type: "Object"; thumbnail: string[] | null; item: ObjectWithFilePaths } | { type: "Location"; item: Location } | { type: "NonIndexedPath"; thumbnail: string[] | null; item: NonIndexedPathItem } | { type: "SpacedropPeer"; item: PeerMetadata } | { type: "Label"; thumbnails: string[][]; item: LabelWithObjects }
 
-export type ExplorerLayout = "grid" | "list" | "media"
+export type ExplorerLayout = "grid" | "list" | "media" | "columns"
 
 export type ExplorerSettings<TOrder> = { layoutMode: ExplorerLayout | null; gridItemSize: number | null; gridGap: number | null; mediaColumns: number | null; mediaAspectSquare: boolean | null; mediaViewWithDescendants: boolean | null; openOnDoubleClick: DoubleClickAction | null; showBytesInGridView: boolean | null; colVisibility: { [key in string]: boolean } | null; colSizes: { [key in string]: number } | null; listViewIconSize: string | null; listViewTextSize: string | null; order?: TOrder | null; showHiddenFiles?: boolean }
 

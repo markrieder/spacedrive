@@ -81,6 +81,8 @@ const LocationExplorer = ({ location }: { location: Location; path?: string }) =
 		[defaultFilters, search.filters]
 	);
 
+	//
+
 	const items = useSearchExplorerQuery({
 		search,
 		explorerSettings,
@@ -130,6 +132,8 @@ const LocationExplorer = ({ location }: { location: Location; path?: string }) =
 
 	useKeyDeleteFile(explorer.selectedItems, location.id);
 
+	//
+
 	useShortcut('rescan', () => rescan(location.id));
 
 	const title = useRouteTitle(
@@ -175,6 +179,7 @@ const LocationExplorer = ({ location }: { location: Location; path?: string }) =
 					)}
 				</TopBarPortal>
 			</SearchContextProvider>
+
 			{isLocationIndexing ? (
 				<div className="flex size-full items-center justify-center">
 					<Loader />
@@ -223,7 +228,7 @@ function getLastSectionOfPath(path: string): string | undefined {
 	return lastSection;
 }
 
-function useLocationExplorerSettings(location: Location) {
+export function useLocationExplorerSettings(location: Location) {
 	const rspc = useRspcLibraryContext();
 
 	const preferences = useLibraryQuery(['preferences.get']);

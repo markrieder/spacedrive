@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { CSSProperties, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useKeys } from 'rooks';
 import {
@@ -21,9 +21,12 @@ import { QuickPreview } from '../QuickPreview';
 import { useQuickPreviewContext } from '../QuickPreview/Context';
 import { getQuickPreviewStore, useQuickPreviewStore } from '../QuickPreview/store';
 import { explorerStore } from '../store';
+import { useSelectedItems } from '../useExplorer';
 import { useExplorerDroppable } from '../useExplorerDroppable';
 import { useExplorerOperatingSystem } from '../useExplorerOperatingSystem';
+import { useExplorerWindow } from '../useExplorerWindow';
 import { useExplorerSearchParams } from '../util';
+import { ColumnsView } from './ColumnsView';
 import { ViewContext, type ExplorerViewContext } from './Context';
 import { DragScrollable } from './DragScrollable';
 import { GridView } from './GridView';
@@ -34,9 +37,18 @@ import { useViewItemDoubleClick } from './ViewItem';
 export interface ExplorerViewProps
 	extends Omit<ExplorerViewContext, 'selectable' | 'ref' | 'padding'> {
 	emptyNotice?: JSX.Element;
+	path?: string;
+	style?: CSSProperties;
 }
 
-export const View = ({ emptyNotice, ...contextProps }: ExplorerViewProps) => {
+export const View = ({
+	emptyNotice,
+	path: explorerPath,
+	style,
+	...contextProps
+}: ExplorerViewProps) => {
+	const items = useExplorerWindow(explorerPath);
+
 	const { explorerOperatingSystem, matchingOperatingSystem } = useExplorerOperatingSystem();
 
 	const explorer = useExplorerContext();
@@ -85,6 +97,8 @@ export const View = ({ emptyNotice, ...contextProps }: ExplorerViewProps) => {
 			disabled: drag?.type === 'dragging' && parent.tag.id === drag.sourceTagId
 		})
 	});
+
+	const selected = useSelectedItems(items.items);
 
 	useShortcuts();
 
@@ -142,10 +156,11 @@ export const View = ({ emptyNotice, ...contextProps }: ExplorerViewProps) => {
 	if (!explorer.layouts[layoutMode]) return null;
 
 	return (
-		<ViewContext.Provider value={{ ref, ...contextProps, selectable }}>
+		<ViewContext.Provider value={{ ref, ...contextProps, selectable, ...items, ...selected }}>
 			<div
 				ref={ref}
-				className="flex flex-1"
+				className="custom-scroll explorer-scroll flex size-full overflow-y-auto overflow-x-hidden border-r border-app-line"
+				style={{ width: layoutMode === 'columns' ? 400 : undefined, ...style }}
 				onMouseDown={(e) => {
 					if (e.button !== 0) return;
 
@@ -165,6 +180,7 @@ export const View = ({ emptyNotice, ...contextProps }: ExplorerViewProps) => {
 							{layoutMode === 'grid' && <GridView />}
 							{layoutMode === 'list' && <ListView />}
 							{layoutMode === 'media' && <MediaView />}
+							{layoutMode === 'columns' && <ColumnsView />}
 							{showLoading && (
 								<Loader className="fixed bottom-10 left-0 w-[calc(100%+180px)]" />
 							)}

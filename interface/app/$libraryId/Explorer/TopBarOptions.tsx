@@ -6,6 +6,7 @@ import {
 	SidebarSimple,
 	SlidersHorizontal,
 	SquaresFour,
+	SquareSplitHorizontal,
 	Tag
 } from '@phosphor-icons/react';
 import clsx from 'clsx';
@@ -25,7 +26,8 @@ import { explorerStore } from './store';
 const layoutIcons: Record<ExplorerLayout, Icon> = {
 	grid: SquaresFour,
 	list: Rows,
-	media: MonitorPlay
+	media: MonitorPlay,
+	columns: SquareSplitHorizontal
 };
 
 export const useExplorerTopBarOptions = () => {

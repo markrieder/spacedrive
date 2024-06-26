@@ -77,6 +77,7 @@ export function useExplorer<TOrder extends Ordering>({
 			grid: true,
 			list: true,
 			media: true,
+			columns: true,
 			...layouts
 		},
 		...settings,
@@ -140,7 +141,7 @@ export type UseExplorerSettings<TOrder extends Ordering, T> = ReturnType<
 	typeof useExplorerSettings<TOrder, T>
 >;
 
-function useSelectedItems(items: ExplorerItem[] | null) {
+export function useSelectedItems(items: ExplorerItem[] | null) {
 	// Doing pointer lookups for hashes is a bit faster than assembling a bunch of strings
 	// WeakMap ensures that ExplorerItems aren't held onto after they're evicted from cache
 	const itemHashesWeakMap = useRef(new WeakMap<ExplorerItem, string>());

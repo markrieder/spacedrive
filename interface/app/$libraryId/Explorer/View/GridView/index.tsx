@@ -20,9 +20,9 @@ export const GridView = () => {
 	const itemHeight = explorerSettings.gridItemSize + itemDetailsHeight;
 
 	const grid = useGrid({
-		scrollRef: explorer.scrollRef,
-		count: explorer.items?.length ?? 0,
-		totalCount: explorer.count,
+		scrollRef: explorerView.ref,
+		count: explorerView.items?.length ?? 0,
+		totalCount: explorerView.count,
 		columns: 'auto',
 		size: { width: explorerSettings.gridItemSize, height: itemHeight },
 		padding: {
@@ -32,14 +32,14 @@ export const GridView = () => {
 		},
 		gap: explorerSettings.gridGap,
 		overscan: explorer.overscan ?? 5,
-		onLoadMore: explorer.loadMore,
+		onLoadMore: explorerView.loadMore,
 		getItemId: useCallback(
-			(index: number) => getItemId(index, explorer.items ?? []),
-			[explorer.items]
+			(index: number) => getItemId(index, explorerView.items ?? []),
+			[explorerView.items]
 		),
 		getItemData: useCallback(
-			(index: number) => getItemData(index, explorer.items ?? []),
-			[explorer.items]
+			(index: number) => getItemData(index, explorerView.items ?? []),
+			[explorerView.items]
 		)
 	});
 
@@ -49,7 +49,7 @@ export const GridView = () => {
 		<DragSelect grid={grid} onActiveItemChange={updateActiveItem}>
 			<Grid grid={grid}>
 				{(index) => {
-					const item = explorer.items?.[index];
+					const item = explorerView.items?.[index];
 					if (!item) return null;
 
 					return (

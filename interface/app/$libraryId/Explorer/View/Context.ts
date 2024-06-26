@@ -1,6 +1,11 @@
 import { createContext, useContext, type ReactNode, type RefObject } from 'react';
 
-export interface ExplorerViewContext {
+import { useSelectedItems } from '../useExplorer';
+import { useExplorerWindow } from '../useExplorerWindow';
+
+export interface ExplorerViewContext
+	extends ReturnType<typeof useExplorerWindow>,
+		ReturnType<typeof useSelectedItems> {
 	ref: RefObject<HTMLDivElement>;
 	/**
 	 * Padding to apply when scrolling to an item.

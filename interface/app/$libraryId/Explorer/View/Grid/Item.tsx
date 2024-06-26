@@ -33,8 +33,8 @@ export const GridItem = ({ children, item, index, ...props }: Props) => {
 	const selected = useMemo(
 		// Even though this checks object equality, it should still be safe since `selectedItems`
 		// will be re-calculated before this memo runs.
-		() => explorer.selectedItems.has(item),
-		[explorer.selectedItems, item]
+		() => explorerView.selectedItems.has(item),
+		[explorerView.selectedItems, item]
 	);
 
 	const canGoBack = currentIndex !== 0;
@@ -61,8 +61,8 @@ export const GridItem = ({ children, item, index, ...props }: Props) => {
 				}
 			}}
 			onContextMenu={(e) => {
-				if (!explorerView.selectable || explorer.selectedItems.has(item)) return;
-				explorer.resetSelectedItems([item]);
+				if (!explorerView.selectable || explorerView.selectedItems.has(item)) return;
+				explorerView.resetSelectedItems([item]);
 				dragSelect.resetSelectedTargets([{ id: uniqueId(item), node: e.currentTarget }]);
 			}}
 		>

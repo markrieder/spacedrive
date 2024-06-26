@@ -1,5 +1,4 @@
-import { FolderNotchOpen } from '@phosphor-icons/react';
-import { CSSProperties, type PropsWithChildren, type ReactNode } from 'react';
+import { CSSProperties, Suspense, type PropsWithChildren, type ReactNode } from 'react';
 import {
 	explorerLayout,
 	useExplorerLayoutStore,
@@ -10,7 +9,6 @@ import { useShortcut } from '~/hooks';
 
 import { useTopBarContext } from '../TopBar/Context';
 import { useExplorerContext } from './Context';
-import ContextMenu from './ContextMenu';
 import DismissibleNotice from './DismissibleNotice';
 import { ExplorerPath, PATH_BAR_HEIGHT } from './ExplorerPath';
 import { Inspector, INSPECTOR_WIDTH } from './Inspector';
@@ -19,11 +17,15 @@ import { getQuickPreviewStore } from './QuickPreview/store';
 import { explorerStore } from './store';
 import { useKeyRevealFinder } from './useKeyRevealFinder';
 import { ExplorerViewProps, View } from './View';
-import { EmptyNotice } from './View/EmptyNotice';
 
 import 'react-slidedown/lib/slidedown.css';
 
+import { FolderNotchOpen } from '@phosphor-icons/react';
+
+import ContextMenu from './ContextMenu';
 import { useExplorerDnd } from './useExplorerDnd';
+import { useExplorerSearchParams } from './util';
+import { EmptyNotice } from './View/EmptyNotice';
 
 interface Props {
 	emptyNotice?: ExplorerViewProps['emptyNotice'];
@@ -38,6 +40,8 @@ export default function Explorer(props: PropsWithChildren<Props>) {
 	const explorer = useExplorerContext();
 	const layoutStore = useExplorerLayoutStore();
 	const showInspector = useSelector(explorerStore, (s) => s.showInspector);
+
+	const [{ path }] = useExplorerSearchParams();
 
 	const showPathBar = explorer.showPathBar && layoutStore.showPathBar;
 
@@ -76,39 +80,53 @@ export default function Explorer(props: PropsWithChildren<Props>) {
 
 	const topBar = useTopBarContext();
 
+	const paths = [undefined, ...(path?.split('/').filter(Boolean) ?? [])];
+
 	return (
 		<>
 			<ExplorerContextMenu>
 				<div
 					ref={explorer.scrollRef}
 					className="custom-scroll explorer-scroll flex flex-1 flex-col overflow-x-hidden"
-					style={
-						{
-							'--scrollbar-margin-top': `${topBar.topBarHeight}px`,
-							'--scrollbar-margin-bottom': `${showPathBar ? PATH_BAR_HEIGHT : 0}px`,
-							'paddingTop': topBar.topBarHeight,
-							'paddingRight': showInspector ? INSPECTOR_WIDTH : 0
-						} as CSSProperties
-					}
 				>
 					{explorer.items && explorer.items.length > 0 && <DismissibleNotice />}
 
-					<View
-						contextMenu={props.contextMenu ? props.contextMenu() : <ContextMenu />}
-						emptyNotice={
-							props.emptyNotice ?? (
-								<EmptyNotice
-									icon={FolderNotchOpen}
-									message="This folder is empty"
-								/>
-							)
-						}
-						listViewOptions={{ hideHeaderBorder: true }}
-						scrollPadding={{
-							top: topBar.topBarHeight,
-							bottom: showPathBar ? PATH_BAR_HEIGHT : undefined
-						}}
-					/>
+					<div className="flex flex-1 overflow-hidden">
+						<Suspense fallback={<SuspanceFb />}>
+							{paths.map((path, i) => {
+								const p = !path ? undefined : paths.slice(0, i + 1).join('/') + '/';
+								console.log('path', path, p);
+								return (
+									<View
+										key={path}
+										style={
+											{
+												'--scrollbar-margin-top': `${topBar.topBarHeight}px`,
+												'--scrollbar-margin-bottom': `${showPathBar ? PATH_BAR_HEIGHT : 0}px`,
+												'paddingTop': topBar.topBarHeight,
+												'paddingRight': showInspector ? INSPECTOR_WIDTH : 0
+											} as CSSProperties
+										}
+										path={p}
+										contextMenu={props.contextMenu?.() ?? <ContextMenu />}
+										emptyNotice={
+											props.emptyNotice ?? (
+												<EmptyNotice
+													icon={FolderNotchOpen}
+													message="This folder is empty"
+												/>
+											)
+										}
+										listViewOptions={{ hideHeaderBorder: true }}
+										scrollPadding={{
+											top: topBar.topBarHeight,
+											bottom: showPathBar ? PATH_BAR_HEIGHT : undefined
+										}}
+									/>
+								);
+							})}
+						</Suspense>
+					</div>
 				</div>
 			</ExplorerContextMenu>
 
@@ -126,3 +144,9 @@ export default function Explorer(props: PropsWithChildren<Props>) {
 		</>
 	);
 }
+
+const SuspanceFb = () => {
+	console.log('Loading...');
+
+	return <div className="flex size-full items-center justify-center">Loading...</div>;
+};
