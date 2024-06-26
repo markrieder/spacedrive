@@ -1,5 +1,8 @@
+import { DebugState, useDebugState, useDebugStateEnabler } from '@sd/client';
 import {
+	ArrowsClockwise,
 	Books,
+	Cloud,
 	FlyingSaucer,
 	Gear,
 	GearSix,
@@ -14,7 +17,6 @@ import {
 } from 'phosphor-react-native';
 import React from 'react';
 import { Platform, SectionList, Text, TouchableWithoutFeedback, View } from 'react-native';
-import { DebugState, useDebugState, useDebugStateEnabler } from '@sd/client';
 import ScreenContainer from '~/components/layout/ScreenContainer';
 import { SettingsItem } from '~/components/settings/SettingsItem';
 import { tw, twStyle } from '~/lib/tailwind';
@@ -86,6 +88,16 @@ const sections: (debugState: DebugState) => SectionType[] = (debugState) => [
 				icon: TagSimple,
 				navigateTo: 'TagsSettings',
 				title: 'Tags',
+			},
+			{
+				icon: Cloud,
+				navigateTo: 'CloudSettings',
+				title: 'Cloud',
+			},
+			{
+				icon: ArrowsClockwise,
+				navigateTo: 'SyncSettings',
+				title: 'Sync',
 				rounded: 'bottom'
 			}
 			// {
@@ -129,7 +141,7 @@ function renderSectionHeader({ section }: { section: { title: string } }) {
 		<Text
 			style={twStyle(
 				'mb-3 text-lg font-bold text-ink',
-				section.title === 'Client' ? 'mt-2' : 'mt-5'
+				section.title === 'Client' ? 'mt-0' : 'mt-5'
 			)}
 		>
 			{section.title}
@@ -141,10 +153,10 @@ export default function SettingsScreen({ navigation }: SettingsStackScreenProps<
 	const debugState = useDebugState();
 
 	return (
-		<ScreenContainer tabHeight={false} scrollview={false} style={tw`gap-0 px-6 py-0`}>
+		<ScreenContainer tabHeight={false} style={tw`gap-0 px-5 py-0`}>
 			<SectionList
+				contentContainerStyle={tw`py-6`}
 				sections={sections(debugState)}
-				contentContainerStyle={tw`h-auto pb-5 pt-3`}
 				renderItem={({ item }) => (
 					<SettingsItem
 						title={item.title}
@@ -153,6 +165,7 @@ export default function SettingsScreen({ navigation }: SettingsStackScreenProps<
 						rounded={item.rounded}
 					/>
 				)}
+				scrollEnabled={false}
 				renderSectionHeader={renderSectionHeader}
 				ListFooterComponent={<FooterComponent />}
 				showsVerticalScrollIndicator={false}

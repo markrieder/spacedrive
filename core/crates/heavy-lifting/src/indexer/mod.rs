@@ -1,17 +1,13 @@
-use crate::NonCriticalJobError;
+use crate::{utils::sub_path, OuterContext};
 
-use sd_core_file_path_helper::{
-	ensure_file_path_exists, ensure_sub_path_is_directory, ensure_sub_path_is_in_location,
-	FilePathError, IsolatedFilePathData,
-};
-use sd_core_indexer_rules::IndexerRuleError;
+use sd_core_file_path_helper::{FilePathError, IsolatedFilePathData};
 use sd_core_prisma_helpers::{
 	file_path_pub_and_cas_ids, file_path_to_isolate_with_pub_id, file_path_walker,
 };
 use sd_core_sync::Manager as SyncManager;
 
 use sd_prisma::{
-	prisma::{file_path, location, PrismaClient, SortOrder},
+	prisma::{file_path, indexer_rule, location, PrismaClient, SortOrder},
 	prisma_sync,
 };
 use sd_sync::OperationFactory;
@@ -30,17 +26,16 @@ use std::{
 };
 
 use itertools::Itertools;
-use prisma_client_rust::{operator::or, Select};
+use prisma_client_rust::{operator::or, QueryError, Select};
 use rspc::ErrorCode;
 use serde::{Deserialize, Serialize};
 use specta::Type;
-use tracing::warn;
+use tracing::{instrument, warn};
 
-mod job;
+pub mod job;
 mod shallow;
 mod tasks;
 
-pub use job::IndexerJob;
 pub use shallow::shallow;
 
 use tasks::walker;
@@ -49,16 +44,16 @@ use tasks::walker;
 const BATCH_SIZE: usize = 1000;
 
 #[derive(thiserror::Error, Debug)]
-pub enum IndexerError {
+pub enum Error {
 	// Not Found errors
 	#[error("indexer rule not found: <id='{0}'>")]
-	IndexerRuleNotFound(i32),
-	#[error("received sub path not in database: <path='{}'>", .0.display())]
-	SubPathNotFound(Box<Path>),
+	IndexerRuleNotFound(indexer_rule::id::Type),
+	#[error(transparent)]
+	SubPath(#[from] sub_path::Error),
 
 	// Internal Errors
-	#[error("database Error: {0}")]
-	Database(#[from] prisma_client_rust::QueryError),
+	#[error("database error: {0}")]
+	Database(#[from] QueryError),
 	#[error(transparent)]
 	FileIO(#[from] FileIOError),
 	#[error(transparent)]
@@ -72,24 +67,27 @@ pub enum IndexerError {
 
 	// Mixed errors
 	#[error(transparent)]
-	Rules(#[from] IndexerRuleError),
+	Rules(#[from] sd_core_indexer_rules::Error),
 }
 
-impl From<IndexerError> for rspc::Error {
-	fn from(err: IndexerError) -> Self {
-		match err {
-			IndexerError::IndexerRuleNotFound(_) | IndexerError::SubPathNotFound(_) => {
-				Self::with_cause(ErrorCode::NotFound, err.to_string(), err)
+impl From<Error> for rspc::Error {
+	fn from(e: Error) -> Self {
+		match e {
+			Error::IndexerRuleNotFound(_) => {
+				Self::with_cause(ErrorCode::NotFound, e.to_string(), e)
 			}
 
-			IndexerError::Rules(rule_err) => rule_err.into(),
+			Error::SubPath(sub_path_err) => sub_path_err.into(),
 
-			_ => Self::with_cause(ErrorCode::InternalServerError, err.to_string(), err),
+			Error::Rules(rule_err) => rule_err.into(),
+
+			_ => Self::with_cause(ErrorCode::InternalServerError, e.to_string(), e),
 		}
 	}
 }
 
-#[derive(thiserror::Error, Debug, Serialize, Deserialize, Type)]
+#[derive(thiserror::Error, Debug, Serialize, Deserialize, Type, Clone)]
+#[serde(rename_all = "snake_case")]
 pub enum NonCriticalIndexerError {
 	#[error("failed to read directory entry: {0}")]
 	FailedDirectoryEntry(String),
@@ -109,36 +107,6 @@ pub enum NonCriticalIndexerError {
 	DispatchKeepWalking(String),
 	#[error("missing file_path data on database: {0}")]
 	MissingFilePathData(String),
-}
-
-async fn determine_initial_walk_path(
-	location_id: location::id::Type,
-	sub_path: &Option<impl AsRef<Path> + Send + Sync>,
-	location_path: impl AsRef<Path> + Send,
-	db: &PrismaClient,
-) -> Result<PathBuf, IndexerError> {
-	let location_path = location_path.as_ref();
-
-	match sub_path {
-		Some(sub_path) if sub_path.as_ref() != Path::new("") => {
-			let sub_path = sub_path.as_ref();
-			let full_path = ensure_sub_path_is_in_location(location_path, sub_path).await?;
-
-			ensure_sub_path_is_directory(location_path, sub_path).await?;
-
-			ensure_file_path_exists(
-				sub_path,
-				&IsolatedFilePathData::new(location_id, location_path, &full_path, true)
-					.map_err(IndexerError::from)?,
-				db,
-				IndexerError::SubPathNotFound,
-			)
-			.await?;
-
-			Ok(full_path)
-		}
-		_ => Ok(location_path.to_path_buf()),
-	}
 }
 
 fn chunk_db_queries<'db, 'iso>(
@@ -165,7 +133,7 @@ async fn update_directory_sizes(
 	iso_paths_and_sizes: HashMap<IsolatedFilePathData<'_>, u64, impl BuildHasher + Send>,
 	db: &PrismaClient,
 	sync: &SyncManager,
-) -> Result<(), IndexerError> {
+) -> Result<(), Error> {
 	let to_sync_and_update = db
 		._batch(chunk_db_queries(iso_paths_and_sizes.keys(), db))
 		.await?
@@ -185,13 +153,15 @@ async fn update_directory_sizes(
 					file_path::size_in_bytes_bytes::NAME,
 					msgpack!(size_bytes),
 				),
-				db.file_path().update(
-					file_path::pub_id::equals(file_path.pub_id),
-					vec![file_path::size_in_bytes_bytes::set(Some(size_bytes))],
-				),
+				db.file_path()
+					.update(
+						file_path::pub_id::equals(file_path.pub_id),
+						vec![file_path::size_in_bytes_bytes::set(Some(size_bytes))],
+					)
+					.select(file_path::select!({ id })),
 			))
 		})
-		.collect::<Result<Vec<_>, IndexerError>>()?
+		.collect::<Result<Vec<_>, Error>>()?
 		.into_iter()
 		.unzip::<_, _, Vec<_>, Vec<_>>();
 
@@ -200,11 +170,11 @@ async fn update_directory_sizes(
 	Ok(())
 }
 
-async fn update_location_size<InvalidateQuery: Fn(&'static str) + Send + Sync>(
+async fn update_location_size(
 	location_id: location::id::Type,
 	db: &PrismaClient,
-	invalidate_query: &InvalidateQuery,
-) -> Result<(), IndexerError> {
+	ctx: &impl OuterContext,
+) -> Result<(), Error> {
 	let total_size = db
 		.file_path()
 		.find_many(vec![
@@ -232,8 +202,8 @@ async fn update_location_size<InvalidateQuery: Fn(&'static str) + Send + Sync>(
 		.exec()
 		.await?;
 
-	invalidate_query("locations.list");
-	invalidate_query("locations.get");
+	ctx.invalidate_query("locations.list");
+	ctx.invalidate_query("locations.get");
 
 	Ok(())
 }
@@ -242,7 +212,7 @@ async fn remove_non_existing_file_paths(
 	to_remove: Vec<file_path_pub_and_cas_ids::Data>,
 	db: &PrismaClient,
 	sync: &sd_core_sync::Manager,
-) -> Result<u64, IndexerError> {
+) -> Result<u64, Error> {
 	#[allow(clippy::cast_sign_loss)]
 	let (sync_params, db_params): (Vec<_>, Vec<_>) = to_remove
 		.into_iter()
@@ -272,15 +242,23 @@ async fn remove_non_existing_file_paths(
 	.map_err(Into::into)
 }
 
+#[instrument(
+	skip(base_path, location_path, db, sync, errors),
+	fields(
+		base_path = %base_path.as_ref().display(),
+		location_path = %location_path.as_ref().display(),
+	),
+	err,
+)]
 #[allow(clippy::missing_panics_doc)] // Can't actually panic as we only deal with directories
-async fn reverse_update_directories_sizes(
+pub async fn reverse_update_directories_sizes(
 	base_path: impl AsRef<Path> + Send,
 	location_id: location::id::Type,
 	location_path: impl AsRef<Path> + Send,
 	db: &PrismaClient,
 	sync: &SyncManager,
-	errors: &mut Vec<NonCriticalJobError>,
-) -> Result<(), IndexerError> {
+	errors: &mut Vec<crate::NonCriticalError>,
+) -> Result<(), Error> {
 	let location_path = location_path.as_ref();
 
 	let ancestors = base_path
@@ -360,7 +338,7 @@ async fn reverse_update_directories_sizes(
 					),
 				))
 			} else {
-				warn!("Got a missing ancestor for a file_path in the database, maybe we have a corruption");
+				warn!("Got a missing ancestor for a file_path in the database, ignoring...");
 				None
 			}
 		})
@@ -376,9 +354,10 @@ async fn compute_sizes(
 	materialized_paths: Vec<String>,
 	pub_id_by_ancestor_materialized_path: &mut HashMap<String, (file_path::pub_id::Type, u64)>,
 	db: &PrismaClient,
-	errors: &mut Vec<NonCriticalJobError>,
-) -> Result<(), IndexerError> {
-	db.file_path()
+	errors: &mut Vec<crate::NonCriticalError>,
+) -> Result<(), QueryError> {
+	for file_path in db
+		.file_path()
 		.find_many(vec![
 			file_path::location_id::equals(Some(location_id)),
 			file_path::materialized_path::in_vec(materialized_paths),
@@ -386,30 +365,29 @@ async fn compute_sizes(
 		.select(file_path::select!({ pub_id materialized_path size_in_bytes_bytes }))
 		.exec()
 		.await?
-		.into_iter()
-		.for_each(|file_path| {
-			if let Some(materialized_path) = file_path.materialized_path {
-				if let Some((_, size)) =
-					pub_id_by_ancestor_materialized_path.get_mut(&materialized_path)
-				{
-					*size += file_path.size_in_bytes_bytes.map_or_else(
-						|| {
-							warn!("Got a directory missing its size in bytes");
-							0
-						},
-						|size_in_bytes_bytes| size_in_bytes_from_db(&size_in_bytes_bytes),
-					);
-				}
-			} else {
-				errors.push(
-					NonCriticalIndexerError::MissingFilePathData(format!(
+	{
+		if let Some(materialized_path) = file_path.materialized_path {
+			if let Some((_, size)) =
+				pub_id_by_ancestor_materialized_path.get_mut(&materialized_path)
+			{
+				*size += file_path.size_in_bytes_bytes.map_or_else(
+					|| {
+						warn!("Got a directory missing its size in bytes");
+						0
+					},
+					|size_in_bytes_bytes| size_in_bytes_from_db(&size_in_bytes_bytes),
+				);
+			}
+		} else {
+			errors.push(
+				NonCriticalIndexerError::MissingFilePathData(format!(
 						"Corrupt database possessing a file_path entry without materialized_path: <pub_id='{:#?}'>",
 						from_bytes_to_uuid(&file_path.pub_id)
 					))
-					.into(),
-				);
-			}
-		});
+				.into(),
+			);
+		}
+	}
 
 	Ok(())
 }
@@ -440,7 +418,7 @@ impl walker::WalkerDBProxy for WalkerDBProxy {
 	async fn fetch_file_paths(
 		&self,
 		found_paths: Vec<file_path::WhereParam>,
-	) -> Result<Vec<file_path_walker::Data>, IndexerError> {
+	) -> Result<Vec<file_path_walker::Data>, Error> {
 		// Each found path is a AND with 4 terms, and SQLite has a expression tree limit of 1000 terms
 		// so we will use chunks of 200 just to be safe
 		self.db
@@ -465,54 +443,73 @@ impl walker::WalkerDBProxy for WalkerDBProxy {
 	async fn fetch_file_paths_to_remove(
 		&self,
 		parent_iso_file_path: &IsolatedFilePathData<'_>,
+		mut existing_inodes: HashSet<Vec<u8>>,
 		unique_location_id_materialized_path_name_extension_params: Vec<file_path::WhereParam>,
 	) -> Result<Vec<file_path_pub_and_cas_ids::Data>, NonCriticalIndexerError> {
 		// NOTE: This batch size can be increased if we wish to trade memory for more performance
 		const BATCH_SIZE: i64 = 1000;
 
-		let founds_ids = self
-			.db
-			._batch(
-				unique_location_id_materialized_path_name_extension_params
-					.into_iter()
-					.chunks(200)
-					.into_iter()
-					.map(|unique_params| {
-						self.db
-							.file_path()
-							.find_many(vec![or(unique_params.collect())])
-							.select(file_path::select!({ id }))
-					})
-					.collect::<Vec<_>>(),
-			)
-			.await
-			.map(|founds_chunk| {
-				founds_chunk
-					.into_iter()
-					.flat_map(|file_paths| file_paths.into_iter().map(|file_path| file_path.id))
-					.collect::<HashSet<_>>()
-			})
-			.map_err(|e| NonCriticalIndexerError::FetchAlreadyExistingFilePathIds(e.to_string()))?;
+		let founds_ids = {
+			let found_chunks = self
+				.db
+				._batch(
+					unique_location_id_materialized_path_name_extension_params
+						.into_iter()
+						.chunks(200)
+						.into_iter()
+						.map(|unique_params| {
+							self.db
+								.file_path()
+								.find_many(vec![or(unique_params.collect())])
+								.select(file_path::select!({ id inode }))
+						})
+						.collect::<Vec<_>>(),
+				)
+				.await
+				.map_err(|e| {
+					NonCriticalIndexerError::FetchAlreadyExistingFilePathIds(e.to_string())
+				})?;
+
+			found_chunks
+				.into_iter()
+				.flatten()
+				.map(|file_path| {
+					if let Some(inode) = file_path.inode {
+						existing_inodes.remove(&inode);
+					}
+					file_path.id
+				})
+				.collect::<HashSet<_>>()
+		};
 
 		let mut to_remove = vec![];
 		let mut cursor = 1;
 
 		loop {
+			let materialized_path_param = file_path::materialized_path::equals(Some(
+				parent_iso_file_path
+					.materialized_path_for_children()
+					.expect("the received isolated file path must be from a directory"),
+			));
+
 			let found = self
 				.db
 				.file_path()
 				.find_many(vec![
 					file_path::location_id::equals(Some(self.location_id)),
-					file_path::materialized_path::equals(Some(
-						parent_iso_file_path
-							.materialized_path_for_children()
-							.expect("the received isolated file path must be from a directory"),
-					)),
+					if existing_inodes.is_empty() {
+						materialized_path_param
+					} else {
+						or(vec![
+							materialized_path_param,
+							file_path::inode::in_vec(existing_inodes.iter().cloned().collect()),
+						])
+					},
 				])
 				.order_by(file_path::id::order(SortOrder::Asc))
 				.take(BATCH_SIZE)
 				.cursor(file_path::id::equals(cursor))
-				.select(file_path_pub_and_cas_ids::select())
+				.select(file_path::select!({ id pub_id cas_id inode }))
 				.exec()
 				.await
 				.map_err(|e| NonCriticalIndexerError::FetchFilePathsToRemove(e.to_string()))?;
@@ -526,11 +523,17 @@ impl walker::WalkerDBProxy for WalkerDBProxy {
 				break;
 			}
 
-			to_remove.extend(
-				found
-					.into_iter()
-					.filter(|file_path| !founds_ids.contains(&file_path.id)),
-			);
+			to_remove.extend(found.into_iter().filter_map(|file_path| {
+				if let Some(inode) = file_path.inode {
+					existing_inodes.remove(&inode);
+				}
+
+				(!founds_ids.contains(&file_path.id)).then_some(file_path_pub_and_cas_ids::Data {
+					id: file_path.id,
+					pub_id: file_path.pub_id,
+					cas_id: file_path.cas_id,
+				})
+			}));
 
 			if should_stop {
 				break;

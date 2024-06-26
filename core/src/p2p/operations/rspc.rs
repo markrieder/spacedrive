@@ -6,10 +6,9 @@ use sd_p2p::{RemoteIdentity, UnicastStream, P2P};
 use tokio::io::AsyncWriteExt;
 use tracing::debug;
 
-use crate::p2p::Header;
+use crate::{p2p::Header, Node};
 
 /// Transfer an rspc query to a remote node.
-#[allow(unused)]
 pub async fn remote_rspc(
 	p2p: Arc<P2P>,
 	identity: RemoteIdentity,
@@ -22,12 +21,12 @@ pub async fn remote_rspc(
 		.clone();
 	let mut stream = peer.new_stream().await?;
 
-	stream.write_all(&Header::Http.to_bytes()).await?;
+	stream.write_all(&Header::RspcRemote.to_bytes()).await?;
 
 	let (mut sender, conn) = hyper::client::conn::handshake(stream).await?;
 	tokio::task::spawn(async move {
-		if let Err(err) = conn.await {
-			println!("Connection error: {:?}", err);
+		if let Err(e) = conn.await {
+			println!("Connection error: {:?}", e);
 		}
 	});
 
@@ -37,16 +36,17 @@ pub async fn remote_rspc(
 pub(crate) async fn receiver(
 	stream: UnicastStream,
 	service: &mut Router,
+	node: &Node,
 ) -> Result<(), Box<dyn Error>> {
 	debug!(
-		"Received http request from peer '{}'",
-		stream.remote_identity(),
+		peer = %stream.remote_identity(),
+		"Received http request from;",
 	);
 
 	// TODO: Authentication
 	#[allow(clippy::todo)]
-	if true {
-		todo!("You wouldn't download a car!");
+	if !node.config.get().await.p2p.enable_remote_access {
+		todo!("No way buddy!");
 	}
 
 	Http::new()

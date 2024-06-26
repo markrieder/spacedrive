@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use crate::{
 	invalidate_query,
 	node::config::{P2PDiscoveryState, Port},
@@ -19,9 +21,13 @@ pub(crate) fn mount() -> AlphaRouter<Ctx> {
 			#[derive(Deserialize, Type)]
 			pub struct ChangeNodeNameArgs {
 				pub name: Option<String>,
-				pub p2p_ipv4_port: Option<Port>,
-				pub p2p_ipv6_port: Option<Port>,
+				pub p2p_port: Option<Port>,
+				pub p2p_disabled: Option<bool>,
+				pub p2p_ipv6_disabled: Option<bool>,
+				pub p2p_relay_disabled: Option<bool>,
 				pub p2p_discovery: Option<P2PDiscoveryState>,
+				pub p2p_remote_access: Option<bool>,
+				pub p2p_manual_peers: Option<HashSet<String>>,
 				pub image_labeler_version: Option<String>,
 			}
 			R.mutation(|node, args: ChangeNodeNameArgs| async move {
@@ -43,14 +49,26 @@ pub(crate) fn mount() -> AlphaRouter<Ctx> {
 							config.name = name;
 						}
 
-						if let Some(port) = args.p2p_ipv4_port {
-							config.p2p_ipv4_port = port;
+						if let Some(port) = args.p2p_port {
+							config.p2p.port = port;
 						};
-						if let Some(port) = args.p2p_ipv6_port {
-							config.p2p_ipv6_port = port;
+						if let Some(enabled) = args.p2p_disabled {
+							config.p2p.disabled = enabled;
 						};
-						if let Some(v) = args.p2p_discovery {
-							config.p2p_discovery = v;
+						if let Some(enabled) = args.p2p_ipv6_disabled {
+							config.p2p.disable_ipv6 = enabled;
+						};
+						if let Some(enabled) = args.p2p_relay_disabled {
+							config.p2p.disable_relay = enabled;
+						};
+						if let Some(discovery) = args.p2p_discovery {
+							config.p2p.discovery = discovery;
+						};
+						if let Some(remote_access) = args.p2p_remote_access {
+							config.p2p.enable_remote_access = remote_access;
+						};
+						if let Some(manual_peers) = args.p2p_manual_peers {
+							config.p2p.manual_peers = manual_peers;
 						};
 
 						#[cfg(feature = "ai")]
@@ -64,8 +82,9 @@ pub(crate) fn mount() -> AlphaRouter<Ctx> {
 								new_model = sd_ai::old_image_labeler::YoloV8::model(Some(&version))
 									.map_err(|e| {
 										error!(
-											"Failed to crate image_detection model: '{}'; Error: {e:#?}",
-											&version,
+											%version,
+											?e,
+											"Failed to crate image_detection model;",
 										);
 									})
 									.ok();
@@ -76,8 +95,8 @@ pub(crate) fn mount() -> AlphaRouter<Ctx> {
 						}
 					})
 					.await
-					.map_err(|err| {
-						error!("Failed to write config: {}", err);
+					.map_err(|e| {
+						error!(?e, "Failed to write config;");
 						rspc::Error::new(
 							ErrorCode::InternalServerError,
 							"error updating config".into(),
@@ -168,21 +187,14 @@ pub(crate) fn mount() -> AlphaRouter<Ctx> {
 				pub background_processing_percentage: u8, // 0-100
 			}
 			R.mutation(
-				|node,
-				 UpdateThumbnailerPreferences {
-				     background_processing_percentage,
-				 }: UpdateThumbnailerPreferences| async move {
+				|node, UpdateThumbnailerPreferences { .. }: UpdateThumbnailerPreferences| async move {
 					node.config
-						.update_preferences(|preferences| {
-							preferences
-								.thumbnailer
-								.set_background_processing_percentage(
-									background_processing_percentage,
-								);
+						.update_preferences(|_| {
+							// TODO(fogodev): introduce configurable workers count to task system
 						})
 						.await
 						.map_err(|e| {
-							error!("failed to update thumbnailer preferences: {e:#?}");
+							error!(?e, "Failed to update thumbnailer preferences;");
 							rspc::Error::with_cause(
 								ErrorCode::InternalServerError,
 								"Failed to update thumbnailer preferences".to_string(),

@@ -8,6 +8,7 @@ use sd_utils::uuid_to_bytes;
 
 use std::{
 	collections::{hash_map::Entry, HashMap},
+	str::FromStr,
 	sync::{
 		atomic::{AtomicBool, Ordering},
 		Arc,
@@ -55,7 +56,7 @@ pub async fn run_actor(
 							.map(|id| {
 								db.cloud_crdt_operation()
 									.find_first(vec![cloud_crdt_operation::instance::is(vec![
-										instance::pub_id::equals(uuid_to_bytes(*id)),
+										instance::pub_id::equals(uuid_to_bytes(id)),
 									])])
 									.order_by(cloud_crdt_operation::timestamp::order(
 										SortOrder::Desc,
@@ -75,8 +76,10 @@ pub async fn run_actor(
 						let cloud_timestamp = d.map(|d| d.timestamp).unwrap_or_default() as u64;
 
 						debug!(
-							"Instance {id}, Sync Timestamp {}, Cloud Timestamp {cloud_timestamp}",
-							sync_timestamp.as_u64()
+							instance_id = %id,
+							sync_timestamp = sync_timestamp.as_u64(),
+							%cloud_timestamp,
+							"Comparing sync timestamps",
 						);
 
 						let max_timestamp = Ord::max(cloud_timestamp, sync_timestamp.as_u64());
@@ -117,7 +120,10 @@ pub async fn run_actor(
 				.await
 			);
 
-			info!("Received {} collections", collections.len());
+			info!(
+				collections_count = collections.len(),
+				"Received collections;",
+			);
 
 			if collections.is_empty() {
 				break;
@@ -164,9 +170,11 @@ pub async fn run_actor(
 							&db,
 							&sync,
 							&libraries,
-							collection.instance_uuid,
+							&collection.instance_uuid,
 							instance.identity,
-							instance.node_id,
+							&instance.node_id,
+							RemoteIdentity::from_str(&instance.node_remote_identity)
+								.expect("malformed remote identity in the DB"),
 							node.p2p.peer_metadata(),
 						)
 						.await
@@ -182,14 +190,10 @@ pub async fn run_actor(
 				let operations = compressed_operations.into_ops();
 
 				debug!(
-					"Processing collection. Instance {}, Start {:?}, End {:?}",
-					&collection.instance_uuid,
-					operations
-						.first()
-						.map(|operation| operation.timestamp.as_u64()),
-					operations
-						.last()
-						.map(|operation| operation.timestamp.as_u64()),
+					instance_id = %collection.instance_uuid,
+					start = ?operations.first().map(|operation| operation.timestamp.as_u64()),
+					end = ?operations.last().map(|operation| operation.timestamp.as_u64()),
+					"Processing collection",
 				);
 
 				err_break!(write_cloud_ops_to_db(operations, &db).await);
@@ -244,9 +248,10 @@ pub async fn upsert_instance(
 	db: &PrismaClient,
 	sync: &sd_core_sync::Manager,
 	libraries: &Libraries,
-	uuid: Uuid,
+	uuid: &Uuid,
 	identity: RemoteIdentity,
-	node_id: Uuid,
+	node_id: &Uuid,
+	node_remote_identity: RemoteIdentity,
 	metadata: HashMap<String, String>,
 ) -> prisma_client_rust::Result<()> {
 	db.instance()
@@ -258,16 +263,21 @@ pub async fn upsert_instance(
 				node_id.as_bytes().to_vec(),
 				Utc::now().into(),
 				Utc::now().into(),
-				vec![instance::metadata::set(Some(
-					serde_json::to_vec(&metadata).expect("unable to serialize metadata"),
-				))],
+				vec![
+					instance::node_remote_identity::set(Some(
+						node_remote_identity.get_bytes().to_vec(),
+					)),
+					instance::metadata::set(Some(
+						serde_json::to_vec(&metadata).expect("unable to serialize metadata"),
+					)),
+				],
 			),
 			vec![],
 		)
 		.exec()
 		.await?;
 
-	sync.timestamps.write().await.entry(uuid).or_default();
+	sync.timestamps.write().await.entry(*uuid).or_default();
 
 	// Called again so the new instances are picked up
 	libraries.update_instances_by_id(library_id).await;

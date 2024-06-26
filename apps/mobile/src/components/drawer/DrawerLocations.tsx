@@ -1,16 +1,14 @@
 import { DrawerNavigationHelpers } from '@react-navigation/drawer/lib/typescript/src/types';
 import { useNavigation } from '@react-navigation/native';
-import { useRef } from 'react';
-import { Pressable, Text, View } from 'react-native';
 import {
-	arraysEqual,
-	byteSize,
 	Location,
-	useCache,
+	arraysEqual,
+	humanizeSize,
 	useLibraryQuery,
-	useNodes,
 	useOnlineLocations
 } from '@sd/client';
+import { useRef } from 'react';
+import { Pressable, Text, View } from 'react-native';
 import { ModalRef } from '~/components/layout/Modal';
 import { tw, twStyle } from '~/lib/tailwind';
 
@@ -47,13 +45,13 @@ const DrawerLocationItem: React.FC<DrawerLocationItemProps> = ({
 							)}
 						/>
 					</View>
-					<Text style={twStyle('text-xs font-medium text-ink')} numberOfLines={1}>
+					<Text style={twStyle('max-w-[150px] text-xs font-medium text-ink')} numberOfLines={1}>
 						{location.name ?? ''}
 					</Text>
 				</View>
-				<View style={tw`rounded-md border border-app-lightborder bg-app-box px-1 py-0.5`}>
-					<Text style={tw`text-[11px] font-medium text-ink-dull`} numberOfLines={1}>
-						{`${byteSize(location.size_in_bytes)}`}
+				<View style={tw`rounded-md border border-app-box/70 bg-app/70 px-1 py-0.5`}>
+					<Text style={tw`text-[11px] font-bold text-ink-dull`} numberOfLines={1}>
+						{`${humanizeSize(location.size_in_bytes)}`}
 					</Text>
 				</View>
 			</View>
@@ -67,8 +65,7 @@ const DrawerLocations = () => {
 	const modalRef = useRef<ModalRef>(null);
 
 	const result = useLibraryQuery(['locations.list'], { keepPreviousData: true });
-	useNodes(result.data?.nodes);
-	const locations = useCache(result.data?.items);
+	const locations = result.data || [];
 
 	return (
 		<>

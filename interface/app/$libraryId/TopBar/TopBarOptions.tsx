@@ -1,11 +1,14 @@
+import { Cards, Minus, Square, X } from '@phosphor-icons/react';
+import { getCurrent, Window } from '@tauri-apps/api/window';
 import clsx from 'clsx';
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import { ModifierKeys, Popover, Tooltip, usePopover } from '@sd/ui';
 import { useIsDark, useOperatingSystem } from '~/hooks';
 
 import TopBarButton from './TopBarButton';
 import TopBarMobile from './TopBarMobile';
 
+const appWindow = new Window('main');
 export interface ToolOption {
 	icon: JSX.Element | ((props: { triggerOpen: () => void }) => JSX.Element);
 	onClick?: () => void;
@@ -23,7 +26,7 @@ interface TopBarChildrenProps {
 	options?: ToolOption[][];
 }
 
-export const TOP_BAR_ICON_STYLE = 'm-0.5 w-[18px] h-[18px] text-ink-dull';
+export const TOP_BAR_ICON_CLASSLIST = 'm-0.5 w-[18px] h-[18px] text-ink-dull';
 
 export default ({ options }: TopBarChildrenProps) => {
 	const [windowSize, setWindowSize] = useState(0);
@@ -56,6 +59,7 @@ export default ({ options }: TopBarChildrenProps) => {
 						/>
 					))
 				)}
+				{os === 'windows' && <WindowsControls windowSize={windowSize} />}
 			</div>
 			<TopBarMobile
 				toolOptions={options}
@@ -167,6 +171,52 @@ function ToolGroup({
 					)}
 				/>
 			)}
+		</div>
+	);
+}
+
+export function WindowsControls({ windowSize }: { windowSize: number }) {
+	const [maximized, setMaximized] = useState(false);
+	const getWindowState = useCallback(async () => {
+		const isMaximized = await getCurrent().isMaximized();
+		setMaximized(isMaximized);
+	}, []);
+
+	useEffect(() => {
+		getWindowState().catch(console.error);
+	}, [getWindowState, windowSize]);
+	return (
+		<div className="mx-1 hidden items-center xl:flex">
+			<TopBarButton
+				className="mx-2"
+				rounding="both"
+				active={false}
+				onClick={() => appWindow.minimize()}
+			>
+				<Minus weight="regular" className={clsx(TOP_BAR_ICON_CLASSLIST)} />
+			</TopBarButton>
+			<TopBarButton
+				rounding="both"
+				className="mx-2"
+				active={false}
+				onClick={() => {
+					appWindow.toggleMaximize();
+				}}
+			>
+				{maximized ? (
+					<Cards weight="regular" className={clsx(TOP_BAR_ICON_CLASSLIST)} />
+				) : (
+					<Square weight="regular" className={clsx(TOP_BAR_ICON_CLASSLIST)} />
+				)}
+			</TopBarButton>
+			<TopBarButton
+				rounding="both"
+				className="mx-2 hover:bg-red-500 *:hover:text-white"
+				active={false}
+				onClick={() => appWindow.close()}
+			>
+				<X weight="regular" className={clsx(TOP_BAR_ICON_CLASSLIST, 'hover:text-white')} />
+			</TopBarButton>
 		</div>
 	);
 }

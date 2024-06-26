@@ -2,6 +2,7 @@ import { proxy } from 'valtio';
 import { proxySet } from 'valtio/utils';
 import { z } from 'zod';
 import {
+	ThumbKey,
 	resetStore,
 	type DoubleClickAction,
 	type ExplorerItem,
@@ -9,6 +10,7 @@ import {
 	type ExplorerSettings,
 	type Ordering
 } from '@sd/client';
+import i18n from '~/app/I18n';
 
 import {
 	DEFAULT_LIST_VIEW_ICON_SIZE,
@@ -96,7 +98,6 @@ type DragState =
 	  };
 
 const state = {
-	tagAssignMode: false,
 	showInspector: false,
 	showMoreInfo: false,
 	newLocationToRedirect: null as null | number,
@@ -104,28 +105,30 @@ const state = {
 	newThumbnails: proxySet() as Set<string>,
 	cutCopyState: { type: 'Idle' } as CutCopyState,
 	drag: null as null | DragState,
+	isTagAssignModeActive: false,
 	isDragSelecting: false,
 	isRenaming: false,
 	// Used for disabling certain keyboard shortcuts when command palette is open
 	isCMDPOpen: false,
 	isContextMenuOpen: false,
-	quickRescanLastRun: Date.now() - 200
+	quickRescanLastRun: Date.now() - 200,
+	// Map = { hotkey: '0'...'9', tagId: 1234 }
+	tagBulkAssignHotkeys: [] as Array<{ hotkey: string; tagId: number }>
 };
 
-export function flattenThumbnailKey(thumbKey: string[]) {
-	return thumbKey.join('/');
+export function flattenThumbnailKey(thumbKey: ThumbKey) {
+	return `${thumbKey.base_directory_str}/${thumbKey.shard_hex}/${thumbKey.cas_id}`;
 }
 
 export const explorerStore = proxy({
 	...state,
 	reset: (_state?: typeof state) => resetStore(explorerStore, _state || state),
-	addNewThumbnail: (thumbKey: string[]) => {
+	addNewThumbnail: (thumbKey: ThumbKey) => {
 		explorerStore.newThumbnails.add(flattenThumbnailKey(thumbKey));
 	},
-	// this should be done when the explorer query is refreshed
-	// prevents memory leak
-	resetNewThumbnails: () => {
+	resetCache: () => {
 		explorerStore.newThumbnails.clear();
+		// explorerStore.newFilePathsIdentified.clear();
 	}
 });
 
@@ -151,24 +154,24 @@ export function isCut(item: ExplorerItem, cutCopyState: CutCopyState) {
 }
 
 export const filePathOrderingKeysSchema = z.union([
-	z.literal('name').describe('Name'),
-	z.literal('sizeInBytes').describe('Size'),
-	z.literal('dateModified').describe('Date Modified'),
-	z.literal('dateIndexed').describe('Date Indexed'),
-	z.literal('dateCreated').describe('Date Created'),
-	z.literal('object.dateAccessed').describe('Date Accessed'),
-	z.literal('object.mediaData.epochTime').describe('Date Taken')
+	z.literal('name').describe(i18n.t('name')),
+	z.literal('sizeInBytes').describe(i18n.t('size')),
+	z.literal('dateModified').describe(i18n.t('date_modified')),
+	z.literal('dateIndexed').describe(i18n.t('date_indexed')),
+	z.literal('dateCreated').describe(i18n.t('date_created')),
+	z.literal('object.dateAccessed').describe(i18n.t('date_accessed')),
+	z.literal('object.mediaData.epochTime').describe(i18n.t('date_taken'))
 ]);
 
 export const objectOrderingKeysSchema = z.union([
-	z.literal('dateAccessed').describe('Date Accessed'),
-	z.literal('kind').describe('Kind'),
-	z.literal('mediaData.epochTime').describe('Date Taken')
+	z.literal('dateAccessed').describe(i18n.t('date_accessed')),
+	z.literal('kind').describe(i18n.t('kind')),
+	z.literal('mediaData.epochTime').describe(i18n.t('date_taken'))
 ]);
 
 export const nonIndexedPathOrderingSchema = z.union([
-	z.literal('name').describe('Name'),
-	z.literal('sizeInBytes').describe('Size'),
-	z.literal('dateCreated').describe('Date Created'),
-	z.literal('dateModified').describe('Date Modified')
+	z.literal('name').describe(i18n.t('name')),
+	z.literal('sizeInBytes').describe(i18n.t('size')),
+	z.literal('dateCreated').describe(i18n.t('date_created')),
+	z.literal('dateModified').describe(i18n.t('date_modified'))
 ]);

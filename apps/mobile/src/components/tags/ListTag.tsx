@@ -1,9 +1,9 @@
-import { DotsThreeOutlineVertical } from 'phosphor-react-native';
+import { Tag } from '@sd/client';
+import { DotsThreeVertical } from 'phosphor-react-native';
 import { useRef } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { ClassInput } from 'twrnc';
-import { Tag } from '@sd/client';
 import { tw, twStyle } from '~/lib/tailwind';
 
 import RightActions from './RightActions';
@@ -19,18 +19,16 @@ const ListTag = ({ tag, tagStyle }: ListTagProps) => {
 	return (
 		<Swipeable
 			ref={swipeRef}
-			containerStyle={tw`rounded-md border border-app-cardborder bg-app-card p-3`}
+			containerStyle={tw`h-12 flex-col justify-center rounded-md border border-app-cardborder bg-app-card`}
 			enableTrackpadTwoFingerGesture
 			renderRightActions={(progress, _, swipeable) => (
-				<>
-					<RightActions progress={progress} swipeable={swipeable} tag={tag} />
-				</>
+				<RightActions progress={progress} swipeable={swipeable} tag={tag} />
 			)}
 		>
-			<View style={twStyle('h-auto flex-row items-center justify-between', tagStyle)}>
+			<View style={twStyle('flex-row items-center justify-between px-3', tagStyle)}>
 				<View style={tw`flex-1 flex-row items-center gap-2`}>
 					<View
-						style={twStyle('h-[28px] w-[28px] rounded-full', {
+						style={twStyle('h-5 w-5 rounded-full', {
 							backgroundColor: tag.color!
 						})}
 					/>
@@ -41,12 +39,12 @@ const ListTag = ({ tag, tagStyle }: ListTagProps) => {
 						{tag.name}
 					</Text>
 				</View>
-				<Pressable hitSlop={24} onPress={() => swipeRef.current?.openRight()}>
-					<DotsThreeOutlineVertical
-						weight="fill"
-						size={20}
-						color={tw.color('ink-dull')}
-					/>
+				<Pressable onPress={() => swipeRef.current?.openRight()}>
+				<DotsThreeVertical
+							weight="bold"
+							size={20}
+							color={tw.color('ink-dull')}
+						/>
 				</Pressable>
 			</View>
 		</Swipeable>

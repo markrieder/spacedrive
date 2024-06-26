@@ -1,16 +1,17 @@
 import { useDrawerStatus } from '@react-navigation/drawer';
 import { useNavigation } from '@react-navigation/native';
+import { useClientContext } from '@sd/client';
 import { MotiView } from 'moti';
-import { CaretRight, Gear, Lock, Plus } from 'phosphor-react-native';
+import { CaretRight, CloudArrowDown, Gear, Lock, Plus } from 'phosphor-react-native';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, Pressable, Text, View } from 'react-native';
-import { useClientContext } from '@sd/client';
 import { tw, twStyle } from '~/lib/tailwind';
 import { currentLibraryStore } from '~/utils/nav';
 
 import { AnimatedHeight } from '../animation/layout';
 import { ModalRef } from '../layout/Modal';
 import CreateLibraryModal from '../modal/CreateLibraryModal';
+import ImportModalLibrary from '../modal/ImportLibraryModal';
 import { Divider } from '../primitive/Divider';
 
 const DrawerLibraryManager = () => {
@@ -23,10 +24,10 @@ const DrawerLibraryManager = () => {
 	}, [isDrawerOpen]);
 
 	const { library: currentLibrary, libraries } = useClientContext();
-
 	const navigation = useNavigation();
 
 	const modalRef = useRef<ModalRef>(null);
+	const modalRef_import = useRef<ModalRef>(null);
 
 	return (
 		<View>
@@ -56,7 +57,6 @@ const DrawerLibraryManager = () => {
 				>
 					{/* Libraries */}
 					{libraries.data?.map((library) => {
-						// console.log('library', library);
 						return (
 							<Pressable
 								key={library.uuid}
@@ -91,6 +91,14 @@ const DrawerLibraryManager = () => {
 						<Text style={tw`text-sm font-semibold text-white`}>New Library</Text>
 					</Pressable>
 					<CreateLibraryModal ref={modalRef} />
+					<Pressable
+						style={tw`flex flex-row items-center px-1.5 py-[8px]`}
+						onPress={() => modalRef_import.current?.present()}
+					>
+						<CloudArrowDown size={18} weight="bold" color="white" style={tw`mr-2`} />
+						<Text style={tw`text-sm font-semibold text-white`}>Import Library</Text>
+					</Pressable>
+					<ImportModalLibrary ref={modalRef_import} />
 					{/* Manage Library */}
 					<Pressable
 						onPress={() => {

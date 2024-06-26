@@ -15,7 +15,7 @@ import { useDropzone, useLocale, useOnDndLeave } from '~/hooks';
 import { hardwareModelToIcon } from '~/util/hardware';
 import { usePlatform } from '~/util/Platform';
 
-import { TOP_BAR_ICON_STYLE } from '../TopBar/TopBarOptions';
+import { TOP_BAR_ICON_CLASSLIST } from '../TopBar/TopBarOptions';
 import { useIncomingSpacedropToast, useSpacedropProgressToast } from './toast';
 
 // TODO: This is super hacky so should probs be rewritten but for now it works.
@@ -57,7 +57,7 @@ export function SpacedropButton({ triggerOpen }: { triggerOpen: () => void }) {
 
 	return (
 		<div ref={ref} className={dndState === 'active' && !isPanelOpen ? 'animate-bounce' : ''}>
-			<Planet className={TOP_BAR_ICON_STYLE} />
+			<Planet className={TOP_BAR_ICON_CLASSLIST} />
 		</div>
 	);
 }
@@ -112,12 +112,12 @@ export function Spacedrop({ triggerClose }: { triggerClose: () => void }) {
 				<Icon name="Spacedrop" size={56} />
 				<span className="text-lg font-bold">Spacedrop</span>
 
-				<div className="flex flex-col space-y-4 pt-2">
+				<div className="flex flex-col pt-2">
 					<p className="text-center text-ink-dull">{t('spacedrop_description')}</p>
 					{discoveredPeers.size === 0 && (
 						<div
 							className={clsx(
-								'flex items-center justify-center gap-3 rounded-md border border-dashed border-app-line bg-app-darkBox px-3 py-2 font-medium text-ink'
+								'mt-3 flex items-center justify-center gap-3 rounded-md border border-dashed border-app-line bg-app-darkBox px-3 py-2 font-medium text-ink'
 							)}
 						>
 							<p className="text-center text-ink-faint">{t('no_nodes_found')}</p>
@@ -159,6 +159,8 @@ function Node({
 		onDrop: (files) => onDropped(id, files)
 	});
 
+	const { t } = useLocale();
+
 	return (
 		<div
 			ref={ref}
@@ -170,7 +172,7 @@ function Node({
 			)}
 			onClick={() => {
 				if (!platform.openFilePickerDialog) {
-					toast.warning('File picker not supported on this platform');
+					toast.warning(t('file_picker_not_supported'));
 					return;
 				}
 

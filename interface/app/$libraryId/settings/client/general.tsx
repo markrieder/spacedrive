@@ -1,13 +1,14 @@
+import { PropsWithChildren } from 'react';
 import { FormProvider } from 'react-hook-form';
 import {
+	ListenerState,
 	useBridgeMutation,
 	useBridgeQuery,
 	useConnectedPeers,
 	useDebugState,
 	useZodForm
 } from '@sd/client';
-import { Button, Card, Input, Select, SelectOption, Slider, Switch, toast, tw, z } from '@sd/ui';
-import i18n from '~/app/I18n';
+import { Button, Card, Input, Switch, Tooltip, tw, z } from '@sd/ui';
 import { Icon } from '~/components';
 import { useDebouncedFormWatch, useLocale } from '~/hooks';
 import { usePlatform } from '~/util/Platform';
@@ -15,30 +16,27 @@ import { usePlatform } from '~/util/Platform';
 import { Heading } from '../Layout';
 import Setting from '../Setting';
 
-const NodePill = tw.div`px-1.5 py-[2px] rounded text-xs font-medium bg-app-selected`;
+export const NodePill = tw.div`px-1.5 py-[2px] rounded text-xs font-medium bg-app-selected`;
 const NodeSettingLabel = tw.div`mb-1 text-xs font-medium`;
 
-// Unsorted list of languages available in the app.
-const LANGUAGE_OPTIONS = [
-	{ value: 'en', label: 'English' },
-	{ value: 'de', label: 'Deutsch' },
-	{ value: 'es', label: 'Español' },
-	{ value: 'fr', label: 'Français' },
-	{ value: 'tr', label: 'Türkçe' },
-	{ value: 'nl', label: 'Nederlands' },
-	{ value: 'by', label: 'Беларуская' },
-	{ value: 'ru', label: 'Русский' },
-	{ value: 'zh_CN', label: '中文（简体）' },
-	{ value: 'zh_TW', label: '中文（繁體）' },
-	{ value: 'it', label: 'Italiano' },
-	{ value: 'ja', label: '日本語' }
-];
-
-// Sort the languages by their label
-LANGUAGE_OPTIONS.sort((a, b) => a.label.localeCompare(b.label));
+function RenderListenerPill(props: PropsWithChildren<{ listener?: ListenerState }>) {
+	if (props.listener?.type === 'Error') {
+		return (
+			<Tooltip label={`Error: ${props.listener.error}`}>
+				<NodePill className="bg-red-700">{props.children}</NodePill>
+			</Tooltip>
+		);
+	} else if (props.listener?.type === 'Listening') {
+		return <NodePill>{props.children}</NodePill>;
+	}
+	return null;
+}
 
 export const Component = () => {
 	const node = useBridgeQuery(['nodeState']);
+	const listeners = useBridgeQuery(['p2p.listeners'], {
+		refetchInterval: 1000
+	});
 	const platform = usePlatform();
 	const debugState = useDebugState();
 	const editNode = useBridgeMutation('nodes.edit');
@@ -46,13 +44,12 @@ export const Component = () => {
 	// const image_labeler_versions = useBridgeQuery(['models.image_detection.list']);
 	const updateThumbnailerPreferences = useBridgeMutation('nodes.updateThumbnailerPreferences');
 
+	const { t } = useLocale();
+
 	const form = useZodForm({
 		schema: z
 			.object({
 				name: z.string().min(1).max(250).optional(),
-				// p2p_enabled: z.boolean().optional(),
-				// p2p_port: u16,
-				// customOrDefault: z.enum(['Custom', 'Default']),
 				image_labeler_version: z.string().optional(),
 				background_processing_percentage: z.coerce
 					.number({
@@ -66,28 +63,25 @@ export const Component = () => {
 		reValidateMode: 'onChange',
 		defaultValues: {
 			name: node.data?.name,
-			// p2p_port: node.data?.p2p_port || 0,
-			// p2p_enabled: node.data?.p2p_enabled,
-			// customOrDefault: node.data?.p2p_port ? 'Custom' : 'Default',
-			image_labeler_version: node.data?.image_labeler_version ?? undefined,
-			background_processing_percentage:
-				node.data?.preferences.thumbnailer.background_processing_percentage || 50
+			image_labeler_version: node.data?.image_labeler_version ?? undefined
+			// background_processing_percentage:
+			// 	node.data?.preferences.thumbnailer.background_processing_percentage || 50
 		}
 	});
 
-	// const watchCustomOrDefault = form.watch('customOrDefault');
-	// const watchP2pEnabled = form.watch('p2p_enabled');
 	const watchBackgroundProcessingPercentage = form.watch('background_processing_percentage');
 
 	useDebouncedFormWatch(form, async (value) => {
 		if (await form.trigger()) {
 			await editNode.mutateAsync({
 				name: value.name || null,
-				p2p_ipv4_port: null,
-				p2p_ipv6_port: null,
+				p2p_port: null,
+				p2p_disabled: null,
+				p2p_ipv6_disabled: null,
+				p2p_relay_disabled: null,
 				p2p_discovery: null,
-				// p2p_port: value.customOrDefault === 'Default' ? 0 : Number(value.p2p_port),
-				// p2p_enabled: value.p2p_enabled ?? null,
+				p2p_remote_access: null,
+				p2p_manual_peers: null,
 				image_labeler_version: value.image_labeler_version ?? null
 			});
 
@@ -101,14 +95,6 @@ export const Component = () => {
 		node.refetch();
 	});
 
-	// form.watch((data) => {
-	// 	if (Number(data.p2p_port) > 65535) {
-	// 		form.setValue('p2p_port', 65535);
-	// 	}
-	// });
-
-	const { t } = useLocale();
-
 	return (
 		<FormProvider {...form}>
 			<Heading
@@ -121,16 +107,15 @@ export const Component = () => {
 					<div className="flex flex-row items-center justify-between">
 						<span className="font-semibold">{t('local_node')}</span>
 						<div className="flex flex-row space-x-1">
-							<NodePill>
-								{connectedPeers.size} {t('peers')}
-							</NodePill>
-							{/* {node.data?.p2p_enabled === true ? (
-								<NodePill className="!bg-accent text-white">
-									{t('running')}
-								</NodePill>
-							) : (
-								<NodePill className="text-white">{t('disabled')}</NodePill>
-							)} */}
+							<RenderListenerPill listener={listeners.data?.ipv4}>
+								IPv4
+							</RenderListenerPill>
+							<RenderListenerPill listener={listeners.data?.ipv6}>
+								IPv6
+							</RenderListenerPill>
+							<RenderListenerPill listener={listeners.data?.relay}>
+								Relay
+							</RenderListenerPill>
 						</div>
 					</div>
 
@@ -203,26 +188,6 @@ export const Component = () => {
 					</div> */}
 				</div>
 			</Card>
-			{/* Language Settings */}
-			<Setting mini title={t('language')} description={t('language_description')}>
-				<div className="flex h-[30px] gap-2">
-					<Select
-						value={i18n.resolvedLanguage || i18n.language || 'en'}
-						onChange={(e) => {
-							// add "i18nextLng" key to localStorage and set it to the selected language
-							localStorage.setItem('i18nextLng', e);
-							i18n.changeLanguage(e);
-						}}
-						containerClassName="h-[30px] whitespace-nowrap"
-					>
-						{LANGUAGE_OPTIONS.map((lang, key) => (
-							<SelectOption key={key} value={lang.value}>
-								{lang.label}
-							</SelectOption>
-						))}
-					</Select>
-				</div>
-			</Setting>
 			{/* Debug Mode */}
 			<Setting mini title={t('debug_mode')} description={t('debug_mode_description')}>
 				<Switch
@@ -232,7 +197,7 @@ export const Component = () => {
 				/>
 			</Setting>
 			{/* Background Processing */}
-			<Setting
+			{/* <Setting
 				mini
 				registerName="background_processing_percentage"
 				title={t('thumbnailer_cpu_usage')}
@@ -263,7 +228,7 @@ export const Component = () => {
 						})}
 					/>
 				</div>
-			</Setting>
+			</Setting> */}
 			{/* Image Labeler */}
 			{/* <Setting
 				mini
@@ -288,86 +253,6 @@ export const Component = () => {
 					/>
 				</div>
 			</Setting> */}
-			<div className="flex flex-col gap-4">
-				<h1 className="mb-3 text-lg font-bold text-ink">{t('networking')}</h1>
-
-				{/* TODO: Add some UI for this stuff */}
-				{/* {node.data?.p2p.ipv4.status === 'Listening' ||
-				node.data?.p2p.ipv4.status === 'Enabling'
-					? `0.0.0.0:${node.data?.p2p.ipv4?.port || 0}`
-					: ''}
-				{node.data?.p2p.ipv6.status === 'Listening' ||
-				node.data?.p2p.ipv6.status === 'Enabling'
-					? `[::1]:${node.data?.p2p.ipv6?.port || 0}`
-					: ''} */}
-
-				<Setting
-					mini
-					title={t('enable_networking')}
-					description={
-						<>
-							<p className="text-sm text-gray-400">
-								{t('enable_networking_description')}
-							</p>
-							<p className="mb-2 text-sm text-gray-400">
-								{t('enable_networking_description_required')}
-							</p>
-						</>
-					}
-				>
-					{/* TODO: Switch doesn't handle optional fields correctly */}
-					<Switch
-						size="md"
-						// checked={watchP2pEnabled || false}
-						// onClick={() => form.setValue('p2p_enabled', !form.getValues('p2p_enabled'))}
-						// disabled
-						onClick={() => toast.info(t('coming_soon'))}
-					/>
-				</Setting>
-				{/* <Setting
-					mini
-					title={t('networking_port')}
-					description={t('networking_port_description')}
-				>
-					<div className="flex h-[30px] gap-2">
-						<Controller
-							control={form.control}
-							name="customOrDefault"
-							render={({ field }) => (
-								<Select
-									containerClassName="h-[30px]"
-									disabled={!watchP2pEnabled}
-									className={clsx(!watchP2pEnabled && 'opacity-50', 'h-full')}
-									{...field}
-									onChange={(e) => {
-										field.onChange(e);
-										form.setValue('p2p_port', 0);
-									}}
-								>
-									<SelectOption value="Default">{t('default')}</SelectOption>
-									<SelectOption value="Custom">{t('custom')}</SelectOption>
-								</Select>
-							)}
-						/>
-						<Input
-							className={clsx(
-								'w-[66px]',
-								watchCustomOrDefault === 'Default' || !watchP2pEnabled
-									? 'opacity-50'
-									: 'opacity-100'
-							)}
-							disabled={watchCustomOrDefault === 'Default' || !watchP2pEnabled}
-							{...form.register('p2p_port')}
-							onChange={(e) => {
-								form.setValue(
-									'p2p_port',
-									Number(e.target.value.replace(/[^0-9]/g, ''))
-								);
-							}}
-						/>
-					</div>
-				</Setting> */}
-			</div>
 		</FormProvider>
 	);
 };

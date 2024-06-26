@@ -1,9 +1,9 @@
 import { useNavigation } from '@react-navigation/native';
-import { DotsThreeOutlineVertical } from 'phosphor-react-native';
+import { Location, arraysEqual, humanizeSize, useOnlineLocations } from '@sd/client';
+import { DotsThreeVertical } from 'phosphor-react-native';
 import { useRef } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
-import { arraysEqual, byteSize, Location, useOnlineLocations } from '@sd/client';
 import { tw, twStyle } from '~/lib/tailwind';
 import { SettingsStackScreenProps } from '~/navigation/tabs/SettingsStack';
 
@@ -25,7 +25,7 @@ const ListLocation = ({ location }: ListLocationProps) => {
 	return (
 		<Swipeable
 			ref={swipeRef}
-			containerStyle={tw`rounded-md border border-app-cardborder bg-app-card`}
+			containerStyle={tw`h-16 rounded-md border border-app-cardborder bg-app-card`}
 			enableTrackpadTwoFingerGesture
 			renderRightActions={(progress, _, swipeable) => (
 				<>
@@ -61,23 +61,17 @@ const ListLocation = ({ location }: ListLocationProps) => {
 						</Text>
 					</View>
 				</View>
-				<View style={tw`flex-row items-center gap-3`}>
-					<View
-						style={tw`rounded-md border border-app-lightborder bg-app-highlight p-1.5`}
-					>
+				<View style={tw`flex-row items-center gap-1.5`}>
+					<View style={tw`rounded-md border border-app-box/70 bg-app/70 px-1.5 py-1`}>
 						<Text
-							style={tw`text-left text-xs font-medium text-ink-dull`}
+							style={tw`text-xs font-bold text-ink-dull`}
 							numberOfLines={1}
 						>
-							{`${byteSize(location.size_in_bytes)}`}
+							{`${humanizeSize(location.size_in_bytes)}`}
 						</Text>
 					</View>
 					<Pressable hitSlop={24} onPress={() => swipeRef.current?.openRight()}>
-						<DotsThreeOutlineVertical
-							weight="fill"
-							size={20}
-							color={tw.color('ink-dull')}
-						/>
+						<DotsThreeVertical weight="bold" size={20} color={tw.color('ink-dull')} />
 					</Pressable>
 				</View>
 			</Card>

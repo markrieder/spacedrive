@@ -1,8 +1,8 @@
+import { useSelector, type ExplorerItem } from '@sd/client';
 import { HTMLAttributes, ReactNode, useMemo } from 'react';
 import { useNavigate } from 'react-router';
-import { useSelector, type ExplorerItem } from '@sd/client';
-import { useOperatingSystem } from '~/hooks';
 import { useRoutingContext } from '~/RoutingContext';
+import { useOperatingSystem } from '~/hooks';
 
 import { useExplorerContext } from '../../Context';
 import { explorerStore, isCut } from '../../store';
@@ -33,9 +33,10 @@ export const GridItem = ({ children, item, index, ...props }: Props) => {
 	const selected = useMemo(
 		// Even though this checks object equality, it should still be safe since `selectedItems`
 		// will be re-calculated before this memo runs.
-		() => explorerView.selectedItems.has(item),
-		[explorerView.selectedItems, item]
+		() => explorer.selectedItems.has(item),
+		[explorer.selectedItems, item]
 	);
+
 
 	const canGoBack = currentIndex !== 0;
 	const canGoForward = currentIndex !== maxIndex;

@@ -9,20 +9,21 @@ use crate::{
 			old_copy::OldFileCopierJobInit, old_cut::OldFileCutterJobInit,
 			old_delete::OldFileDeleterJobInit, old_erase::OldFileEraserJobInit,
 		},
-		media::media_data_image_from_prisma_data,
+		// media::{exif_media_data_from_prisma_data, ffmpeg_data_from_prisma_data},
 	},
-	old_job::Job,
+	old_job::OldJob,
 };
 
 use sd_core_file_path_helper::{FilePathError, IsolatedFilePathData};
+use sd_core_heavy_lifting::media_processor::{exif_media_data, ffmpeg_media_data};
 use sd_core_prisma_helpers::{
 	file_path_to_isolate, file_path_to_isolate_with_id, object_with_file_paths,
+	object_with_media_data,
 };
 
-use sd_cache::{CacheNode, Model, NormalisedResult, Reference};
 use sd_file_ext::kind::ObjectKind;
 use sd_images::ConvertibleExtension;
-use sd_media_metadata::MediaMetadata;
+use sd_media_metadata::{ExifMetadata, FFmpegMetadata};
 use sd_prisma::{
 	prisma::{file_path, location, object},
 	prisma_sync,
@@ -60,6 +61,12 @@ enum FileCreateContextTypes {
 	Text,
 }
 
+#[derive(Serialize, Type)]
+pub(crate) enum MediaData {
+	Exif(ExifMetadata),
+	FFmpeg(FFmpegMetadata),
+}
+
 pub(crate) fn mount() -> AlphaRouter<Ctx> {
 	R.router()
 		.procedure("get", {
@@ -75,21 +82,12 @@ pub(crate) fn mount() -> AlphaRouter<Ctx> {
 				pub note: Option<String>,
 				pub date_created: Option<DateTime<FixedOffset>>,
 				pub date_accessed: Option<DateTime<FixedOffset>>,
-				pub file_paths: Vec<Reference<file_path::Data>>,
-			}
-
-			impl Model for ObjectWithFilePaths2 {
-				fn name() -> &'static str {
-					"Object" // is a duplicate because it's the same entity but with a relation
-				}
+				pub file_paths: Vec<object_with_file_paths::file_paths::Data>,
 			}
 
 			impl ObjectWithFilePaths2 {
-				pub fn from_db(
-					nodes: &mut Vec<CacheNode>,
-					item: object_with_file_paths::Data,
-				) -> Reference<Self> {
-					let this = Self {
+				pub fn from_db(item: object_with_file_paths::Data) -> Self {
+					Self {
 						id: item.id,
 						pub_id: item.pub_id,
 						kind: item.kind,
@@ -100,20 +98,8 @@ pub(crate) fn mount() -> AlphaRouter<Ctx> {
 						note: item.note,
 						date_created: item.date_created,
 						date_accessed: item.date_accessed,
-						file_paths: item
-							.file_paths
-							.into_iter()
-							.map(|i| {
-								let id = i.id.to_string();
-								nodes.push(CacheNode::new(id.clone(), i));
-								Reference::new(id)
-							})
-							.collect(),
-					};
-
-					let id = this.id.to_string();
-					nodes.push(CacheNode::new(id.clone(), this));
-					Reference::new(id)
+						file_paths: item.file_paths,
+					}
 				}
 			}
 
@@ -126,13 +112,7 @@ pub(crate) fn mount() -> AlphaRouter<Ctx> {
 						.include(object_with_file_paths::include())
 						.exec()
 						.await?
-						.map(|item| {
-							let mut nodes = Vec::new();
-							NormalisedResult {
-								item: ObjectWithFilePaths2::from_db(&mut nodes, item),
-								nodes,
-							}
-						}))
+						.map(ObjectWithFilePaths2::from_db))
 				})
 		})
 		.procedure("getMediaData", {
@@ -142,17 +122,23 @@ pub(crate) fn mount() -> AlphaRouter<Ctx> {
 						.db
 						.object()
 						.find_unique(object::id::equals(args))
-						.select(object::select!({ id kind media_data }))
+						.include(object_with_media_data::include())
 						.exec()
 						.await?
 						.and_then(|obj| {
 							Some(match obj.kind {
-								Some(v) if v == ObjectKind::Image as i32 => {
-									MediaMetadata::Image(Box::new(
-										media_data_image_from_prisma_data(obj.media_data?).ok()?,
+								Some(v) if v == ObjectKind::Image as i32 => MediaData::Exif(
+									exif_media_data::from_prisma_data(obj.exif_data?),
+								),
+								Some(v)
+									if v == ObjectKind::Audio as i32
+										|| v == ObjectKind::Video as i32 =>
+								{
+									MediaData::FFmpeg(ffmpeg_media_data::from_prisma_data(
+										obj.ffmpeg_data?,
 									))
 								}
-								_ => return None, // TODO(brxken128): audio and video
+								_ => return None, // No media data
 							})
 						})
 						.ok_or_else(|| {
@@ -491,8 +477,8 @@ pub(crate) fn mount() -> AlphaRouter<Ctx> {
 								Ok(()) => Ok(()),
 								Err(e) if e.kind() == io::ErrorKind::NotFound => {
 									warn!(
-										"File not found in the file system, will remove from database: {}",
-										full_path.display()
+										path = %full_path.display(),
+										"File not found in the file system, will remove from database;",
 									);
 									library
 										.db
@@ -510,7 +496,7 @@ pub(crate) fn mount() -> AlphaRouter<Ctx> {
 								}
 							}
 						}
-						_ => Job::new(args)
+						_ => OldJob::new(args)
 							.spawn(&node, &library)
 							.await
 							.map_err(Into::into),
@@ -561,11 +547,21 @@ pub(crate) fn mount() -> AlphaRouter<Ctx> {
 							);
 
 							#[cfg(not(any(target_os = "ios", target_os = "android")))]
-							trash::delete(&full_path).unwrap();
+							trash::delete(&full_path).map_err(|e| {
+								FileIOError::from((
+									full_path,
+									match e {
+										#[cfg(all(unix, not(target_os = "macos")))]
+										trash::Error::FileSystem { path: _, source: e } => e,
+										_ => io::Error::other(e),
+									},
+									"Failed to delete file",
+								))
+							})?;
 
 							Ok(())
 						}
-						_ => Job::new(args)
+						_ => OldJob::new(args)
 							.spawn(&node, &library)
 							.await
 							.map_err(Into::into),
@@ -647,10 +643,11 @@ pub(crate) fn mount() -> AlphaRouter<Ctx> {
 					})
 					.await
 					.map_err(|e| {
-						error!("{e:#?}");
-						rspc::Error::new(
+						error!(?e, "Failed to convert image;");
+						rspc::Error::with_cause(
 							ErrorCode::InternalServerError,
 							"Had an internal problem converting image".to_string(),
+							e,
 						)
 					})??;
 
@@ -711,7 +708,7 @@ pub(crate) fn mount() -> AlphaRouter<Ctx> {
 		.procedure("eraseFiles", {
 			R.with2(library())
 				.mutation(|(node, library), args: OldFileEraserJobInit| async move {
-					Job::new(args)
+					OldJob::new(args)
 						.spawn(&node, &library)
 						.await
 						.map_err(Into::into)
@@ -720,7 +717,7 @@ pub(crate) fn mount() -> AlphaRouter<Ctx> {
 		.procedure("copyFiles", {
 			R.with2(library())
 				.mutation(|(node, library), args: OldFileCopierJobInit| async move {
-					Job::new(args)
+					OldJob::new(args)
 						.spawn(&node, &library)
 						.await
 						.map_err(Into::into)
@@ -729,7 +726,7 @@ pub(crate) fn mount() -> AlphaRouter<Ctx> {
 		.procedure("cutFiles", {
 			R.with2(library())
 				.mutation(|(node, library), args: OldFileCutterJobInit| async move {
-					Job::new(args)
+					OldJob::new(args)
 						.spawn(&node, &library)
 						.await
 						.map_err(Into::into)
@@ -883,10 +880,11 @@ pub(crate) fn mount() -> AlphaRouter<Ctx> {
 									} else {
 										fs::rename(&from, &to).await.map_err(|e| {
 											error!(
-													"Failed to rename file from: '{}' to: '{}'; Error: {e:#?}",
-													from.display(),
-													to.display()
-												);
+												from = %from.display(),
+												to = %to.display(),
+												?e,
+												"Failed to rename file;",
+											);
 											rspc::Error::with_cause(
 												ErrorCode::Conflict,
 												"Failed to rename file".to_string(),

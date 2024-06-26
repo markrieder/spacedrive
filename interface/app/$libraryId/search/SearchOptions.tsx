@@ -13,9 +13,9 @@ import {
 	tw,
 	usePopover
 } from '@sd/ui';
-import { useIsDark, useKeybind } from '~/hooks';
+import { useIsDark, useKeybind, useLocale } from '~/hooks';
 
-import { AppliedFilters, FilterContainer, InteractiveSection } from './AppliedFilters';
+import { AppliedFilters, InteractiveSection } from './AppliedFilters';
 import { useSearchContext } from './context';
 import { filterRegistry, SearchFilterCRUD, useToggleOptionSelected } from './Filters';
 import {
@@ -78,7 +78,7 @@ export const SearchOptionSubMenu = (
 					<SearchOptionItemInternals {...props}>{props.name}</SearchOptionItemInternals>
 				</ContextMenuDivItem>
 			}
-			className={clsx(MENU_STYLES, 'explorer-scroll -mt-1.5', props.className)}
+			className={clsx(MENU_STYLES, 'explorer-scroll -mt-1.5 max-h-80', props.className)}
 		>
 			{props.children}
 		</DropdownMenu.SubMenu>
@@ -95,6 +95,8 @@ export const SearchOptions = ({
 	const isDark = useIsDark();
 
 	const showSearchTargets = useFeatureFlag('searchTargetSwitcher');
+
+	const { t } = useLocale();
 
 	return (
 		<div
@@ -118,7 +120,7 @@ export const SearchOptions = ({
 							search.target === 'paths' ? 'bg-app-box' : 'hover:bg-app-box/50'
 						)}
 					>
-						Paths
+						{t('paths')}
 					</InteractiveSection>
 					<InteractiveSection
 						onClick={() => search.setTarget?.('objects')}
@@ -126,7 +128,7 @@ export const SearchOptions = ({
 							search.target === 'objects' ? 'bg-app-box' : 'hover:bg-app-box/50'
 						)}
 					>
-						Objects
+						{t('objects')}
 					</InteractiveSection>
 				</OptionContainer>
 			)}
@@ -221,6 +223,8 @@ function AddFilterButton() {
 		[searchQuery]
 	);
 
+	const { t } = useLocale();
+
 	return (
 		<>
 			{registerFilters}
@@ -234,7 +238,7 @@ function AddFilterButton() {
 					trigger={
 						<Button className="flex flex-row gap-1" size="xs" variant="dotted">
 							<FunnelSimple />
-							Add Filter
+							{t('add_filter')}
 						</Button>
 					}
 				>
@@ -245,7 +249,7 @@ function AddFilterButton() {
 						autoComplete="off"
 						autoCorrect="off"
 						variant="transparent"
-						placeholder="Filter..."
+						placeholder={`${t('filter')}...`}
 					/>
 					<Separator />
 					{searchQuery === '' ? (
@@ -274,6 +278,8 @@ function SaveSearchButton() {
 
 	const saveSearch = useLibraryMutation('search.saved.create');
 
+	const { t } = useLocale();
+
 	return (
 		<Popover
 			popover={popover}
@@ -281,7 +287,7 @@ function SaveSearchButton() {
 			trigger={
 				<Button className="flex shrink-0 flex-row" size="xs" variant="dotted">
 					<Plus weight="bold" className="mr-1" />
-					Save Search
+					{t('save_search')}
 				</Button>
 			}
 		>
@@ -310,7 +316,7 @@ function SaveSearchButton() {
 					onChange={(e) => setName(e.target.value)}
 					autoFocus
 					variant="default"
-					placeholder="Name"
+					placeholder={t('name')}
 					className="w-[130px]"
 				/>
 				<Button
@@ -319,7 +325,7 @@ function SaveSearchButton() {
 					className="ml-2"
 					variant="accent"
 				>
-					Save
+					{t('save')}
 				</Button>
 			</form>
 		</Popover>

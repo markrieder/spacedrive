@@ -1,4 +1,6 @@
-use crate::{Error, NonCriticalJobError};
+use crate::{
+	indexer, utils::sub_path::get_full_path_from_sub_path, Error, NonCriticalError, OuterContext,
+};
 
 use sd_core_indexer_rules::{IndexerRule, IndexerRuler};
 use sd_core_prisma_helpers::location_with_indexer_rules;
@@ -16,42 +18,55 @@ use std::{
 
 use futures_concurrency::future::TryJoin;
 use itertools::Itertools;
-use tracing::{debug, warn};
+use tracing::{debug, instrument, warn};
 
 use super::{
-	determine_initial_walk_path, remove_non_existing_file_paths, reverse_update_directories_sizes,
+	remove_non_existing_file_paths, reverse_update_directories_sizes,
 	tasks::{
-		saver::{SaveTask, SaveTaskOutput},
-		updater::{UpdateTask, UpdateTaskOutput},
-		walker::{ToWalkEntry, WalkDirTask, WalkTaskOutput, WalkedEntry},
+		self, saver, updater,
+		walker::{self, ToWalkEntry, WalkedEntry},
 	},
-	update_directory_sizes, update_location_size, IndexerError, IsoFilePathFactory, WalkerDBProxy,
-	BATCH_SIZE,
+	update_directory_sizes, update_location_size, IsoFilePathFactory, WalkerDBProxy, BATCH_SIZE,
 };
 
+#[instrument(
+	skip_all,
+	fields(
+		location_id = location.id,
+		location_path = ?location.path,
+		sub_path = %sub_path.as_ref().display()
+	)
+	err,
+)]
 pub async fn shallow(
 	location: location_with_indexer_rules::Data,
 	sub_path: impl AsRef<Path> + Send,
-	dispatcher: BaseTaskDispatcher<Error>,
-	db: Arc<PrismaClient>,
-	sync: Arc<SyncManager>,
-	invalidate_query: impl Fn(&'static str) + Send + Sync,
-) -> Result<Vec<NonCriticalJobError>, Error> {
-	let sub_path = sub_path.as_ref();
+	dispatcher: &BaseTaskDispatcher<Error>,
+	ctx: &impl OuterContext,
+) -> Result<Vec<NonCriticalError>, Error> {
+	let db = ctx.db();
+	let sync = ctx.sync();
 
 	let location_path = maybe_missing(&location.path, "location.path")
 		.map(PathBuf::from)
 		.map(Arc::new)
-		.map_err(IndexerError::from)?;
+		.map_err(indexer::Error::from)?;
 
 	let to_walk_path = Arc::new(
-		determine_initial_walk_path(location.id, &Some(sub_path), &*location_path, &db).await?,
+		get_full_path_from_sub_path::<indexer::Error>(
+			location.id,
+			Some(sub_path.as_ref()),
+			&*location_path,
+			db,
+		)
+		.await?,
 	);
 
-	let Some(WalkTaskOutput {
+	let Some(walker::Output {
 		to_create,
 		to_update,
 		to_remove,
+		non_indexed_paths,
 		mut errors,
 		directory_iso_file_path,
 		total_size,
@@ -60,15 +75,18 @@ pub async fn shallow(
 		&location,
 		Arc::clone(&location_path),
 		Arc::clone(&to_walk_path),
-		Arc::clone(&db),
-		&dispatcher,
+		Arc::clone(db),
+		dispatcher,
 	)
 	.await?
 	else {
 		return Ok(vec![]);
 	};
 
-	let removed_count = remove_non_existing_file_paths(to_remove, &db, &sync).await?;
+	// TODO use non_indexed_paths here in the future, sending it to frontend, showing then alongside the indexed files from db
+	debug!(non_indexed_paths_count = non_indexed_paths.len());
+
+	let removed_count = remove_non_existing_file_paths(to_remove, db, sync).await?;
 
 	let Some(Metadata {
 		indexed_count,
@@ -77,9 +95,9 @@ pub async fn shallow(
 		&location,
 		to_create,
 		to_update,
-		Arc::clone(&db),
-		Arc::clone(&sync),
-		&dispatcher,
+		Arc::clone(db),
+		Arc::clone(sync),
+		dispatcher,
 	)
 	.await?
 	else {
@@ -89,8 +107,8 @@ pub async fn shallow(
 	if indexed_count > 0 || removed_count > 0 || updated_count > 0 {
 		update_directory_sizes(
 			HashMap::from([(directory_iso_file_path, total_size)]),
-			&db,
-			&sync,
+			db,
+			sync,
 		)
 		.await?;
 
@@ -99,32 +117,36 @@ pub async fn shallow(
 				&*to_walk_path,
 				location.id,
 				&*location_path,
-				&db,
-				&sync,
+				db,
+				sync,
 				&mut errors,
 			)
 			.await?;
 		}
 
-		update_location_size(location.id, &db, &invalidate_query).await?;
+		update_location_size(location.id, db, ctx).await?;
 	}
 
 	if indexed_count > 0 || removed_count > 0 {
-		invalidate_query("search.paths");
+		ctx.invalidate_query("search.paths");
 	}
 
 	Ok(errors)
 }
 
+#[instrument(
+	skip_all,
+	fields(to_walk_path = %to_walk_path.display())
+)]
 async fn walk(
 	location: &location_with_indexer_rules::Data,
 	location_path: Arc<PathBuf>,
 	to_walk_path: Arc<PathBuf>,
 	db: Arc<PrismaClient>,
 	dispatcher: &BaseTaskDispatcher<Error>,
-) -> Result<Option<WalkTaskOutput>, Error> {
-	match dispatcher
-		.dispatch(WalkDirTask::new(
+) -> Result<Option<walker::Output<WalkerDBProxy, IsoFilePathFactory>>, Error> {
+	let Ok(task_handle) = dispatcher
+		.dispatch(tasks::Walker::new_shallow(
 			ToWalkEntry::from(&*to_walk_path),
 			to_walk_path,
 			location
@@ -133,7 +155,7 @@ async fn walk(
 				.map(|rule| IndexerRule::try_from(&rule.indexer_rule))
 				.collect::<Result<Vec<_>, _>>()
 				.map(IndexerRuler::new)
-				.map_err(IndexerError::from)?,
+				.map_err(indexer::Error::from)?,
 			IsoFilePathFactory {
 				location_id: location.id,
 				location_path,
@@ -142,14 +164,17 @@ async fn walk(
 				location_id: location.id,
 				db,
 			},
-			None::<BaseTaskDispatcher<Error>>,
 		)?)
 		.await
-		.await?
-	{
+	else {
+		debug!("Task system is shutting down while a shallow indexer was in progress");
+		return Ok(None);
+	};
+
+	match task_handle.await? {
 		sd_task_system::TaskStatus::Done((_, TaskOutput::Out(data))) => Ok(Some(
 			*data
-				.downcast::<WalkTaskOutput>()
+				.downcast::<walker::Output<WalkerDBProxy, IsoFilePathFactory>>()
 				.expect("we just dispatched this task"),
 		)),
 		sd_task_system::TaskStatus::Done((_, TaskOutput::Empty)) => {
@@ -186,7 +211,7 @@ async fn save_and_update(
 		.chunks(BATCH_SIZE)
 		.into_iter()
 		.map(|chunk| {
-			SaveTask::new(
+			tasks::Saver::new_shallow(
 				location.id,
 				location.pub_id.clone(),
 				chunk.collect::<Vec<_>>(),
@@ -201,7 +226,7 @@ async fn save_and_update(
 				.chunks(BATCH_SIZE)
 				.into_iter()
 				.map(|chunk| {
-					UpdateTask::new(
+					tasks::Updater::new_shallow(
 						chunk.collect::<Vec<_>>(),
 						Arc::clone(&db),
 						Arc::clone(&sync),
@@ -216,25 +241,28 @@ async fn save_and_update(
 		updated_count: 0,
 	};
 
-	for task_status in dispatcher
-		.dispatch_many_boxed(save_and_update_tasks)
-		.await
+	let Ok(tasks_handles) = dispatcher.dispatch_many_boxed(save_and_update_tasks).await else {
+		debug!("Task system is shutting down while a shallow indexer was in progress");
+		return Ok(None);
+	};
+
+	for task_status in tasks_handles
 		.into_iter()
-		.map(CancelTaskOnDrop)
+		.map(CancelTaskOnDrop::new)
 		.collect::<Vec<_>>()
 		.try_join()
 		.await?
 	{
 		match task_status {
 			sd_task_system::TaskStatus::Done((_, TaskOutput::Out(data))) => {
-				if data.is::<SaveTaskOutput>() {
+				if data.is::<saver::Output>() {
 					metadata.indexed_count += data
-						.downcast::<SaveTaskOutput>()
+						.downcast::<saver::Output>()
 						.expect("just checked")
 						.saved_count;
 				} else {
 					metadata.updated_count += data
-						.downcast::<UpdateTaskOutput>()
+						.downcast::<updater::Output>()
 						.expect("just checked")
 						.updated_count;
 				}

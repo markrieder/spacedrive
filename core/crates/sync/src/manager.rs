@@ -8,6 +8,7 @@ use std::{
 	cmp::Ordering,
 	collections::HashMap,
 	fmt,
+	num::NonZeroU128,
 	ops::Deref,
 	sync::{
 		atomic::{self, AtomicBool},
@@ -24,6 +25,7 @@ pub struct Manager {
 	pub tx: broadcast::Sender<SyncMessage>,
 	pub ingest: ingest::Handler,
 	pub shared: Arc<SharedState>,
+	pub timestamp_lock: tokio::sync::Semaphore,
 }
 
 impl fmt::Debug for Manager {
@@ -45,15 +47,20 @@ pub struct New {
 
 impl Manager {
 	#[allow(clippy::new_ret_no_self)]
-	pub fn new(
+	pub async fn new(
 		db: &Arc<PrismaClient>,
 		instance: Uuid,
 		emit_messages_flag: &Arc<AtomicBool>,
 		timestamps: HashMap<Uuid, NTP64>,
+		actors: &Arc<sd_actors::Actors>,
 	) -> New {
 		let (tx, rx) = broadcast::channel(64);
 
-		let clock = HLCBuilder::new().with_id(instance.into()).build();
+		let clock = HLCBuilder::new()
+			.with_id(uhlc::ID::from(
+				NonZeroU128::new(instance.to_u128_le()).expect("Non zero id"),
+			))
+			.build();
 
 		let shared = Arc::new(SharedState {
 			db: db.clone(),
@@ -63,12 +70,18 @@ impl Manager {
 			emit_messages_flag: emit_messages_flag.clone(),
 			active: Default::default(),
 			active_notify: Default::default(),
+			actors: actors.clone(),
 		});
 
-		let ingest = ingest::Actor::spawn(shared.clone());
+		let ingest = ingest::Actor::declare(shared.clone()).await;
 
 		New {
-			manager: Self { tx, ingest, shared },
+			manager: Self {
+				tx,
+				ingest,
+				shared,
+				timestamp_lock: tokio::sync::Semaphore::new(1),
+			},
 			rx,
 		}
 	}
@@ -80,19 +93,35 @@ impl Manager {
 	pub async fn write_ops<'item, I: prisma_client_rust::BatchItem<'item>>(
 		&self,
 		tx: &PrismaClient,
-		(_ops, queries): (Vec<CRDTOperation>, I),
+		(mut ops, queries): (Vec<CRDTOperation>, I),
 	) -> prisma_client_rust::Result<<I as prisma_client_rust::BatchItemParent>::ReturnValue> {
 		let ret = if self.emit_messages_flag.load(atomic::Ordering::Relaxed) {
+			let lock = self.timestamp_lock.acquire().await;
+
+			ops.iter_mut().for_each(|op| {
+				op.timestamp = *self.get_clock().new_timestamp().get_time();
+			});
+
 			let (res, _) = tx
 				._batch((
 					queries,
-					_ops.iter()
+					ops.iter()
 						.map(|op| crdt_op_db(op).to_query(tx))
 						.collect::<Vec<_>>(),
 				))
 				.await?;
 
+			if let Some(last) = ops.last() {
+				self.shared
+					.timestamps
+					.write()
+					.await
+					.insert(self.instance, last.timestamp);
+			}
+
 			self.tx.send(SyncMessage::Created).ok();
+
+			drop(lock);
 
 			res
 		} else {
@@ -106,18 +135,30 @@ impl Manager {
 	pub async fn write_op<'item, Q: prisma_client_rust::BatchItem<'item>>(
 		&self,
 		tx: &PrismaClient,
-		op: CRDTOperation,
+		mut op: CRDTOperation,
 		query: Q,
 	) -> prisma_client_rust::Result<<Q as prisma_client_rust::BatchItemParent>::ReturnValue> {
 		let ret = if self.emit_messages_flag.load(atomic::Ordering::Relaxed) {
+			let lock = self.timestamp_lock.acquire().await;
+
+			op.timestamp = *self.get_clock().new_timestamp().get_time();
+
 			let ret = tx._batch((crdt_op_db(&op).to_query(tx), query)).await?.1;
 
 			self.tx.send(SyncMessage::Created).ok();
+
+			drop(lock);
 
 			ret
 		} else {
 			tx._batch(vec![query]).await?.remove(0)
 		};
+
+		self.shared
+			.timestamps
+			.write()
+			.await
+			.insert(self.instance, op.timestamp);
 
 		Ok(ret)
 	}
@@ -134,7 +175,7 @@ impl Manager {
 			.crdt_operation()
 			.find_many(vec![
 				crdt_operation::instance::is(vec![instance::pub_id::equals(uuid_to_bytes(
-					instance_uuid,
+					&instance_uuid,
 				))]),
 				crdt_operation::timestamp::gt(timestamp.as_u64() as i64),
 			])
@@ -163,7 +204,7 @@ impl Manager {
 						.map(|(instance_id, timestamp)| {
 							prisma_client_rust::and![
 								$op::instance::is(vec![instance::pub_id::equals(uuid_to_bytes(
-									*instance_id
+									instance_id
 								))]),
 								$op::timestamp::gt(timestamp.as_u64() as i64)
 							]
@@ -175,7 +216,7 @@ impl Manager {
 										.clocks
 										.iter()
 										.map(|(instance_id, _)| {
-											uuid_to_bytes(*instance_id)
+											uuid_to_bytes(instance_id)
 										})
 										.collect()
 								)
@@ -210,7 +251,7 @@ impl Manager {
 	pub async fn get_cloud_ops(
 		&self,
 		args: GetOpsArgs,
-	) -> prisma_client_rust::Result<Vec<CRDTOperation>> {
+	) -> prisma_client_rust::Result<Vec<(i32, CRDTOperation)>> {
 		let db = &self.db;
 
 		macro_rules! db_args {
@@ -222,7 +263,7 @@ impl Manager {
 						.map(|(instance_id, timestamp)| {
 							prisma_client_rust::and![
 								$op::instance::is(vec![instance::pub_id::equals(uuid_to_bytes(
-									*instance_id
+									instance_id
 								))]),
 								$op::timestamp::gt(timestamp.as_u64() as i64)
 							]
@@ -234,7 +275,7 @@ impl Manager {
 										.clocks
 										.iter()
 										.map(|(instance_id, _)| {
-											uuid_to_bytes(*instance_id)
+											uuid_to_bytes(instance_id)
 										})
 										.collect()
 								)

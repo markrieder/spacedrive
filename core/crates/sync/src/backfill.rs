@@ -2,7 +2,7 @@ use std::future::Future;
 
 use sd_prisma::{
 	prisma::{
-		crdt_operation, file_path, label, label_on_object, location, media_data, object, tag,
+		crdt_operation, exif_data, file_path, label, label_on_object, location, object, tag,
 		tag_on_object, PrismaClient, SortOrder,
 	},
 	prisma_sync,
@@ -15,6 +15,8 @@ use crate::crdt_op_unchecked_db;
 /// Takes all the syncable data in the database and generates CRDTOperations for it.
 /// This is a requirement before the library can sync.
 pub async fn backfill_operations(db: &PrismaClient, sync: &crate::Manager, instance_id: i32) {
+	let lock = sync.timestamp_lock.acquire().await;
+
 	db._transaction()
 		.with_timeout(9999999999)
 		.run(|db| async move {
@@ -68,6 +70,12 @@ pub async fn backfill_operations(db: &PrismaClient, sync: &crate::Manager, insta
 						.find_many(vec![location::id::gt(cursor)])
 						.order_by(location::id::order(SortOrder::Asc))
 						.take(1000)
+						.include(location::include!({
+							instance: select {
+								id
+								pub_id
+							}
+						}))
 						.exec()
 				},
 				|location| location.id,
@@ -106,6 +114,14 @@ pub async fn backfill_operations(db: &PrismaClient, sync: &crate::Manager, insta
 												),
 												option_sync_entry!(l.hidden, hidden),
 												option_sync_entry!(l.date_created, date_created),
+												option_sync_entry!(
+													l.instance.map(|i| {
+														prisma_sync::instance::SyncId {
+															pub_id: i.pub_id,
+														}
+													}),
+													instance
+												),
 											],
 										),
 									)
@@ -161,11 +177,11 @@ pub async fn backfill_operations(db: &PrismaClient, sync: &crate::Manager, insta
 
 			paginate(
 				|cursor| {
-					db.media_data()
-						.find_many(vec![media_data::id::gt(cursor)])
-						.order_by(media_data::id::order(SortOrder::Asc))
+					db.exif_data()
+						.find_many(vec![exif_data::id::gt(cursor)])
+						.order_by(exif_data::id::order(SortOrder::Asc))
 						.take(1000)
-						.include(media_data::include!({
+						.include(exif_data::include!({
 							object: select { pub_id }
 						}))
 						.exec()
@@ -177,10 +193,10 @@ pub async fn backfill_operations(db: &PrismaClient, sync: &crate::Manager, insta
 							media_datas
 								.into_iter()
 								.flat_map(|md| {
-									use media_data::*;
+									use exif_data::*;
 
 									sync.shared_create(
-										prisma_sync::media_data::SyncId {
+										prisma_sync::exif_data::SyncId {
 											object: prisma_sync::object::SyncId {
 												pub_id: md.object.pub_id,
 											},
@@ -412,6 +428,8 @@ pub async fn backfill_operations(db: &PrismaClient, sync: &crate::Manager, insta
 		})
 		.await
 		.unwrap();
+
+	drop(lock);
 }
 
 async fn paginate<

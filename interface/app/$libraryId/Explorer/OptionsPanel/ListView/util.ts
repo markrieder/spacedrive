@@ -1,6 +1,4 @@
 export function getSizes<T extends { [key: string]: number }>(sizes: T) {
-	console.log('gen sizes');
-
 	const sizesArr = (Object.entries(sizes) as [keyof T, T[keyof T]][]).sort((a, b) => a[1] - b[1]);
 
 	// Map fo size to index

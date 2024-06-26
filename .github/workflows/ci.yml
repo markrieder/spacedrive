@@ -20,8 +20,10 @@ concurrency:
 
 jobs:
   typescript:
-    name: TypeScript
-    runs-on: ubuntu-latest
+    name: Type and style check
+    runs-on: ubuntu-22.04
+    timeout-minutes: 7
+    permissions: {}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -34,9 +36,20 @@ jobs:
       - name: Perform typechecks
         run: pnpm typecheck
 
+      - name: Perform style check
+        run: |-
+          set -eux
+          pnpm autoformat only-frontend
+          if [ -n "$(git diff --name-only --cached)" ]; then
+            echo "Some files are not correctly formatted. Please run 'pnpm autoformat' and commit the changes." >&2
+            exit 1
+          fi
+
   eslint:
     name: ESLint
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
+    permissions: {}
+    timeout-minutes: 5
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -52,6 +65,8 @@ jobs:
   cypress:
     name: Cypress
     runs-on: macos-14
+    timeout-minutes: 45
+    permissions: {}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -66,6 +81,13 @@ jobs:
         uses: ./.github/actions/setup-pnpm
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install Cypress
+        run: |
+          set -euxo pipefail
+          pnpm exec cypress install
+          rm -rf /Users/runner/.cache/Cypress
+          ln -sf /Users/runner/Library/Caches/Cypress /Users/runner/.cache/Cypress
 
       - name: Setup Cypress
         uses: cypress-io/github-action@v6
@@ -84,14 +106,16 @@ jobs:
           command: env CI=true pnpm test:e2e
           working-directory: apps/web
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload cypress screenshots
+        uses: actions/upload-artifact@v4
         if: always()
         with:
           name: cypress-screenshots
           path: apps/web/cypress/screenshots
           if-no-files-found: ignore
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload cypress video's
+        uses: actions/upload-artifact@v4
         if: always()
         with:
           name: cypress-videos
@@ -100,7 +124,10 @@ jobs:
 
   rustfmt:
     name: Rust Formatting
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
     steps:
       - name: Maximize build space
         if: ${{ runner.os == 'Linux' }}
@@ -118,12 +145,17 @@ jobs:
         shell: powershell
         run: |
           New-Item -ItemType Directory -Force -Path C:\spacedrive_target
+      - name: Symlink target to C:\
+        if: ${{ runner.os == 'Windows' }}
+        shell: powershell
+        run: |
           New-Item -Path target -ItemType Junction -Value C:\spacedrive_target
 
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - uses: dorny/paths-filter@v3
+      - name: Check if files have changed
+        uses: dorny/paths-filter@v3
         continue-on-error: true
         id: filter
         with:
@@ -151,11 +183,23 @@ jobs:
         run: cargo fmt --all -- --check
 
   clippy:
-    name: Clippy (${{ matrix.platform }})
-    runs-on: ${{ matrix.platform }}
     strategy:
+      fail-fast: true
       matrix:
-        platform: [ubuntu-20.04, macos-14, windows-latest]
+        settings:
+          - host: macos-13
+            target: x86_64-apple-darwin
+          - host: macos-14
+            target: aarch64-apple-darwin
+          - host: windows-latest
+            target: x86_64-pc-windows-msvc
+          - host: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+    name: Clippy (${{ matrix.settings.host }})
+    runs-on: ${{ matrix.settings.host }}
+    permissions:
+      contents: read
+    timeout-minutes: 45
     steps:
       - name: Maximize build space
         if: ${{ runner.os == 'Linux' }}
@@ -178,7 +222,8 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - uses: dorny/paths-filter@v3
+      - name: Find files that have changed
+        uses: dorny/paths-filter@v3
         continue-on-error: true
         id: filter
         with:
@@ -196,6 +241,7 @@ jobs:
               - 'extensions/*/**'
               - 'Cargo.toml'
               - 'Cargo.lock'
+              - '.github/workflows/ci.yml'
 
       - name: Setup System and Rust
         if: steps.filter.outcome != 'success' || steps.filter.outputs.changes == 'true'
@@ -205,22 +251,15 @@ jobs:
 
       - name: Run Clippy
         if: steps.filter.outcome != 'success' || steps.filter.outputs.changes == 'true'
-        uses: actions-rs-plus/clippy-check@v2
+        uses: giraffate/clippy-action@v1
         with:
-          args: --workspace --all-features --locked
+          reporter: github-pr-review
+          tool_name: 'Clippy (${{ matrix.settings.host }})'
+          filter_mode: diff_context
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          clippy_flags: --workspace --all-features --locked
+          fail_on_error: true
 
-  # test:
-  #   name: Test (${{ matrix.platform }})
-  #   runs-on: ${{ matrix.platform }}
-  #   strategy:
-  #     matrix:
-  #       platform: [ubuntu-20.04, macos-latest, windows-latest]
-  #   steps:
-  #     - name: Checkout repository
-  #       uses: actions/checkout@v4
-  #
-  #     - name: Setup
-  #       uses: ./.github/actions/setup
-  #
-  #     - name: Test
-  #       run: cargo test --workspace --all-features
+      # - name: Run tests
+      #   if: steps.filter.outcome != 'success' || steps.filter.outputs.changes == 'true'
+      #   run: cargo test --workspace --all-features --locked --target ${{ matrix.settings.target }}

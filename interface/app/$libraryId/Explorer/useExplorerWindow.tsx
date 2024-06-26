@@ -28,7 +28,7 @@ export function useExplorerWindow(path?: string) {
 		[location.id]
 	);
 
-	const search = useSearchFromSearchParams();
+	const search = useSearchFromSearchParams({ defaultTarget: 'paths' })
 
 	const searchFiltersAreDefault = useMemo(
 		() => JSON.stringify(defaultFilters) !== JSON.stringify(search.filters),
@@ -60,7 +60,7 @@ export function useExplorerWindow(path?: string) {
 		],
 		take,
 		paths: { order: explorerSettings.useSettingsSnapshot().order },
-		onSuccess: () => explorerStore.resetNewThumbnails()
+		onSuccess: () => explorerStore.resetCache()
 	});
 
 	return items;

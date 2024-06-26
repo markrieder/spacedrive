@@ -5,6 +5,7 @@ import { Subheading } from '..';
 import { useExplorerContext } from '../../Context';
 import { LIST_VIEW_ICON_SIZES } from '../../View/ListView/useTable';
 import { getSizes } from './util';
+import { useMemo } from 'react';
 
 const sizes = getSizes(LIST_VIEW_ICON_SIZES);
 
@@ -14,15 +15,18 @@ export const IconSize = () => {
 	const explorer = useExplorerContext();
 	const settings = explorer.useSettingsSnapshot();
 
-	const defaultValue = sizes.indexMap.get(settings.listViewIconSize)!;
+	const value = useMemo(
+		() => sizes.indexMap.get(settings.listViewIconSize),
+		[settings.listViewIconSize]
+	);
 
 	return (
 		<div>
 			<Subheading>{t('icon_size')}</Subheading>
 			<Slider
 				step={1}
-				max={sizes.indexMap.size - 1}
-				defaultValue={[defaultValue]}
+				max={sizes.sizeMap.size - 1}
+				value={[value ?? 0]}
 				onValueChange={([value]) => {
 					const size = value !== undefined && sizes.sizeMap.get(value);
 					if (size) explorer.settingsStore.listViewIconSize = size;

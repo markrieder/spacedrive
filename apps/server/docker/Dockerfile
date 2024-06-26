@@ -21,7 +21,7 @@ RUN --mount=type=cache,target=/var/cache/apt --mount=type=cache,target=/var/lib/
 FROM base as build-base
 
 RUN --mount=type=cache,target=/var/cache/apt --mount=type=cache,target=/var/lib/apt \
-	apt-get install build-essential git sudo unzip wget curl
+	apt-get install build-essential git sudo unzip wget curl python3 python-is-python3
 
 RUN wget -qO- https://get.pnpm.io/install.sh | env SHELL=bash PNPM_HOME=/usr/share/pnpm sh -
 
@@ -29,7 +29,7 @@ ENV PNPM_HOME="/usr/share/pnpm" \
 	PATH="/usr/share/pnpm:$PATH"
 
 RUN pnpm env use --global latest
-RUN pnpm add -g pnpm@latest-8
+RUN pnpm add -g pnpm@latest-9
 
 WORKDIR /srv
 
@@ -111,8 +111,14 @@ ADD --chmod=755 --checksum=sha256:1d127c69218f2cd14964036f2b057c4b2652cda3996c69
 
 COPY --chmod=755 entrypoint.sh /usr/bin/
 
+# P2P config
+ENV SD_DOCKER=true
+
 # Expose webserver
 EXPOSE 8080
+
+# Expose P2P
+EXPOSE 7373
 
 # Create the data directory to store the database
 VOLUME [ "/data" ]

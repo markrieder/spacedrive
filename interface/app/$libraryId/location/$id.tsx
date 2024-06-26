@@ -1,20 +1,16 @@
 import { ArrowClockwise, Info } from '@phosphor-icons/react';
-import { useEffect, useMemo } from 'react';
-import { stringify } from 'uuid';
 import {
 	arraysEqual,
-	ExplorerSettings,
 	FilePathOrder,
+	filePathOrderingKeysSchema,
 	Location,
-	useCache,
-	useLibraryMutation,
 	useLibraryQuery,
 	useLibrarySubscription,
-	useNodes,
-	useOnlineLocations,
-	useRspcLibraryContext
+	useOnlineLocations
 } from '@sd/client';
 import { Loader, Tooltip } from '@sd/ui';
+import { useCallback, useEffect, useMemo } from 'react';
+import { stringify } from 'uuid';
 import { LocationIdParamsSchema } from '~/app/route-schemas';
 import { Folder, Icon } from '~/components';
 import {
@@ -29,20 +25,17 @@ import { useQuickRescan } from '~/hooks/useQuickRescan';
 
 import Explorer from '../Explorer';
 import { ExplorerContextProvider } from '../Explorer/Context';
-import {
-	createDefaultExplorerSettings,
-	explorerStore,
-	filePathOrderingKeysSchema
-} from '../Explorer/store';
+import { createDefaultExplorerSettings, explorerStore } from '../Explorer/store';
 import { DefaultTopBarOptions } from '../Explorer/TopBarOptions';
 import { useExplorer, useExplorerSettings } from '../Explorer/useExplorer';
+import { useExplorerPreferences } from '../Explorer/useExplorerPreferences';
 import { useExplorerSearchParams } from '../Explorer/util';
 import { EmptyNotice } from '../Explorer/View/EmptyNotice';
 import { SearchContextProvider, SearchOptions, useSearchFromSearchParams } from '../search';
 import SearchBar from '../search/SearchBar';
 import { useSearchExplorerQuery } from '../search/useSearchExplorerQuery';
 import { TopBarPortal } from '../TopBar/Portal';
-import { TOP_BAR_ICON_STYLE } from '../TopBar/TopBarOptions';
+import { TOP_BAR_ICON_CLASSLIST } from '../TopBar/TopBarOptions';
 import LocationOptions from './LocationOptions';
 
 export const Component = () => {
@@ -52,8 +45,7 @@ export const Component = () => {
 		keepPreviousData: true,
 		suspense: true
 	});
-	useNodes(result.data?.nodes);
-	const location = useCache(result.data?.item);
+	const location = result.data;
 
 	// 'key' allows search state to be thrown out when entering a folder
 	return <LocationExplorer key={path} location={location!} />;
@@ -74,7 +66,7 @@ const LocationExplorer = ({ location }: { location: Location; path?: string }) =
 		[location.id]
 	);
 
-	const search = useSearchFromSearchParams();
+	const search = useSearchFromSearchParams({ defaultTarget: 'paths' });
 
 	const searchFiltersAreDefault = useMemo(
 		() => JSON.stringify(defaultFilters) !== JSON.stringify(search.filters),
@@ -106,7 +98,7 @@ const LocationExplorer = ({ location }: { location: Location; path?: string }) =
 		],
 		take,
 		paths: { order: explorerSettings.useSettingsSnapshot().order },
-		onSuccess: () => explorerStore.resetNewThumbnails()
+		onSuccess: () => explorerStore.resetCache()
 	});
 
 	const explorer = useExplorer({
@@ -152,7 +144,7 @@ const LocationExplorer = ({ location }: { location: Location; path?: string }) =
 					left={
 						<div className="flex items-center gap-2">
 							<Folder size={22} className="-mt-px" />
-							<span className="truncate text-sm font-medium">{title}</span>
+							<span className="text-sm font-medium truncate">{title}</span>
 							<LocationOfflineInfo location={location} />
 							<LocationOptions location={location} path={path || ''} />
 						</div>
@@ -163,7 +155,7 @@ const LocationExplorer = ({ location }: { location: Location; path?: string }) =
 								{
 									toolTipLabel: t('reload'),
 									onClick: () => rescan(location.id),
-									icon: <ArrowClockwise className={TOP_BAR_ICON_STYLE} />,
+									icon: <ArrowClockwise className={TOP_BAR_ICON_CLASSLIST} />,
 									individual: true,
 									showAtResolution: 'xl:flex'
 								}
@@ -181,7 +173,7 @@ const LocationExplorer = ({ location }: { location: Location; path?: string }) =
 			</SearchContextProvider>
 
 			{isLocationIndexing ? (
-				<div className="flex size-full items-center justify-center">
+				<div className="flex items-center justify-center size-full">
 					<Loader />
 				</div>
 			) : !preferences.isLoading ? (
@@ -229,55 +221,28 @@ function getLastSectionOfPath(path: string): string | undefined {
 }
 
 export function useLocationExplorerSettings(location: Location) {
-	const rspc = useRspcLibraryContext();
-
-	const preferences = useLibraryQuery(['preferences.get']);
-	const updatePreferences = useLibraryMutation('preferences.update');
-
-	const settings = useMemo(() => {
-		const defaults = createDefaultExplorerSettings<FilePathOrder>({
-			order: { field: 'name', value: 'Asc' }
-		});
-
-		if (!location) return defaults;
-
-		const pubId = stringify(location.pub_id);
-
-		const settings = preferences.data?.location?.[pubId]?.explorer;
-
-		if (!settings) return defaults;
-
-		for (const [key, value] of Object.entries(settings)) {
-			if (value !== null) Object.assign(defaults, { [key]: value });
-		}
-
-		return defaults;
-	}, [location, preferences.data?.location]);
-
-	const onSettingsChanged = async (
-		settings: ExplorerSettings<FilePathOrder>,
-		changedLocation: Location
-	) => {
-		if (changedLocation.id === location.id && preferences.isLoading) return;
-
-		const pubId = stringify(changedLocation.pub_id);
-
-		try {
-			await updatePreferences.mutateAsync({
-				location: { [pubId]: { explorer: settings } }
-			});
-			rspc.queryClient.invalidateQueries(['preferences.get']);
-		} catch (e) {
-			alert('An error has occurred while updating your preferences.');
-		}
-	};
+	const preferences = useExplorerPreferences({
+		data: location,
+		createDefaultSettings: useCallback(
+			() =>
+				createDefaultExplorerSettings<FilePathOrder>({
+					order: { field: 'name', value: 'Asc' }
+				}),
+			[]
+		),
+		getSettings: useCallback(
+			(prefs) => prefs.location?.[stringify(location.pub_id)]?.explorer,
+			[location.pub_id]
+		),
+		writeSettings: (settings) => ({
+			location: { [stringify(location.pub_id)]: { explorer: settings } }
+		})
+	});
 
 	return {
 		explorerSettings: useExplorerSettings({
-			settings,
-			onSettingsChanged,
-			orderingKeys: filePathOrderingKeysSchema,
-			data: location
+			...preferences.explorerSettingsProps,
+			orderingKeys: filePathOrderingKeysSchema
 		}),
 		preferences
 	};

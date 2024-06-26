@@ -12,6 +12,7 @@ export type Platform = {
 	version?: string;
 	links?: Array<{ name: string; arch: string }>;
 	disabled?: boolean;
+	note?: string;
 };
 
 export const platforms = {
@@ -36,8 +37,9 @@ export const platforms = {
 		name: 'Linux',
 		os: 'linux',
 		icon: LinuxLogo,
-		version: 'AppImage',
-		links: [{ name: 'x86_64', arch: 'x86_64' }]
+		version: 'deb',
+		links: [{ name: 'x86_64', arch: 'x86_64' }],
+		note: 'Supports Ubuntu 22.04+, Debian Bookworm+, Linux Mint 21+, PopOS 22.04+'
 	},
 	docker: { name: 'Docker', icon: Docker },
 	android: { name: 'Android', icon: AndroidLogo, version: '10+', disabled: true },

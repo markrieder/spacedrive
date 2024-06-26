@@ -1,19 +1,21 @@
 use crate::{
 	api::{utils::InvalidateOperationEvent, CoreEvent},
 	library::Library,
-	object::media::old_thumbnail::WEBP_EXTENSION,
-	p2p::operations,
+	p2p::operations::{self, request_file},
 	util::InfallibleResponse,
 	Node,
 };
 
 use sd_core_file_path_helper::IsolatedFilePathData;
+use sd_core_heavy_lifting::media_processor::WEBP_EXTENSION;
 use sd_core_prisma_helpers::file_path_to_handle_custom_uri;
 
 use sd_file_ext::text::is_text;
 use sd_p2p::{RemoteIdentity, P2P};
+use sd_p2p_block::Range;
 use sd_prisma::prisma::{file_path, location};
 use sd_utils::db::maybe_missing;
+use tokio_util::sync::PollSender;
 
 use std::{
 	cmp::min,
@@ -25,8 +27,9 @@ use std::{
 	sync::Arc,
 };
 
+use async_stream::stream;
 use axum::{
-	body::{self, Body, BoxBody, Full},
+	body::{self, Body, BoxBody, Full, StreamBody},
 	extract::{self, State},
 	http::{HeaderMap, HeaderValue, Request, Response, StatusCode},
 	middleware,
@@ -34,6 +37,7 @@ use axum::{
 	routing::get,
 	Router,
 };
+use bytes::Bytes;
 use http_body::combinators::UnsyncBoxBody;
 use hyper::{header, upgrade::OnUpgrade};
 use mini_moka::sync::Cache;
@@ -50,6 +54,8 @@ mod async_read_body;
 mod mpsc_to_async_write;
 mod serve_file;
 mod utils;
+
+use mpsc_to_async_write::MpscToAsyncWrite;
 
 type CacheKey = (Uuid, file_path::id::Type);
 
@@ -68,7 +74,11 @@ pub enum ServeFrom {
 	/// Serve from the local filesystem
 	Local,
 	/// Serve from a specific instance
-	Remote(RemoteIdentity),
+	Remote {
+		library_identity: Box<RemoteIdentity>,
+		node_identity: Box<RemoteIdentity>,
+		library: Arc<Library>,
+	},
 }
 
 #[derive(Clone)]
@@ -93,8 +103,8 @@ async fn request_to_remote_node(
 
 	let mut response = match operations::remote_rspc(p2p.clone(), identity, request).await {
 		Ok(v) => v,
-		Err(err) => {
-			warn!("Error doing remote rspc query with '{identity}': {err:?}");
+		Err(e) => {
+			warn!(%identity, ?e, "Error doing remote rspc query with;");
 			return StatusCode::BAD_GATEWAY.into_response();
 		}
 	};
@@ -111,21 +121,21 @@ async fn request_to_remote_node(
 		};
 
 		tokio::spawn(async move {
-			let Ok(mut request_upgraded) = request_upgraded.await.map_err(|err| {
-				warn!("Error upgrading websocket request: {err}");
+			let Ok(mut request_upgraded) = request_upgraded.await.map_err(|e| {
+				warn!(?e, "Error upgrading websocket request;");
 			}) else {
 				return;
 			};
-			let Ok(mut response_upgraded) = response_upgraded.await.map_err(|err| {
-				warn!("Error upgrading websocket response: {err}");
+			let Ok(mut response_upgraded) = response_upgraded.await.map_err(|e| {
+				warn!(?e, "Error upgrading websocket response;");
 			}) else {
 				return;
 			};
 
 			copy_bidirectional(&mut request_upgraded, &mut response_upgraded)
 				.await
-				.map_err(|err| {
-					warn!("Error upgrading websocket response: {err}");
+				.map_err(|e| {
+					warn!(?e, "Error upgrading websocket response;");
 				})
 				.ok();
 		});
@@ -176,17 +186,29 @@ async fn get_or_init_lru_entry(
 		let path = Path::new(path)
 			.join(IsolatedFilePathData::try_from((location_id, &file_path)).map_err(not_found)?);
 
-		let identity =
+		let library_identity =
 			RemoteIdentity::from_bytes(&instance.remote_identity).map_err(internal_server_error)?;
+
+		let node_identity = RemoteIdentity::from_bytes(
+			instance
+				.node_remote_identity
+				.as_ref()
+				.expect("node_remote_identity is required"),
+		)
+		.map_err(internal_server_error)?;
 
 		let lru_entry = CacheValue {
 			name: path,
 			ext: maybe_missing(file_path.extension, "extension").map_err(not_found)?,
 			file_path_pub_id: Uuid::from_slice(&file_path.pub_id).map_err(internal_server_error)?,
-			serve_from: if identity == library.identity.to_remote_identity() {
+			serve_from: if library_identity == library.identity.to_remote_identity() {
 				ServeFrom::Local
 			} else {
-				ServeFrom::Remote(identity)
+				ServeFrom::Remote {
+					library_identity: Box::new(library_identity),
+					node_identity: Box::new(node_identity),
+					library: library.clone(),
+				}
 			},
 		};
 
@@ -216,9 +238,9 @@ pub fn base_router() -> Router<LocalState> {
 					.then_some(())
 					.ok_or_else(|| not_found(()))?;
 
-					let file = File::open(&path).await.map_err(|err| {
+					let file = File::open(&path).await.map_err(|e| {
 						InfallibleResponse::builder()
-							.status(if err.kind() == io::ErrorKind::NotFound {
+							.status(if e.kind() == io::ErrorKind::NotFound {
 								StatusCode::NOT_FOUND
 							} else {
 								StatusCode::INTERNAL_SERVER_ERROR
@@ -240,15 +262,12 @@ pub fn base_router() -> Router<LocalState> {
 		.route(
 			"/file/:lib_id/:loc_id/:path_id",
 			get(
-				|State(state): State<LocalState>,
-				 path: ExtractedPath,
-				 mut request: Request<Body>| async move {
-					let part_parts = path.0.clone();
+				|State(state): State<LocalState>, path: ExtractedPath, request: Request<Body>| async move {
 					let (
 						CacheValue {
 							name: file_path_full_path,
 							ext: extension,
-							file_path_pub_id: _file_path_pub_id,
+							file_path_pub_id,
 							serve_from,
 							..
 						},
@@ -264,42 +283,64 @@ pub fn base_router() -> Router<LocalState> {
 								.then_some(())
 								.ok_or_else(|| not_found(()))?;
 
-							let mut file =
-								File::open(&file_path_full_path).await.map_err(|err| {
-									InfallibleResponse::builder()
-										.status(if err.kind() == io::ErrorKind::NotFound {
-											StatusCode::NOT_FOUND
-										} else {
-											StatusCode::INTERNAL_SERVER_ERROR
-										})
-										.body(body::boxed(Full::from("")))
-								})?;
+							let mut file = File::open(&file_path_full_path).await.map_err(|e| {
+								InfallibleResponse::builder()
+									.status(if e.kind() == io::ErrorKind::NotFound {
+										StatusCode::NOT_FOUND
+									} else {
+										StatusCode::INTERNAL_SERVER_ERROR
+									})
+									.body(body::boxed(Full::from("")))
+							})?;
 
 							let resp = InfallibleResponse::builder().header(
 								"Content-Type",
 								HeaderValue::from_str(
 									&infer_the_mime_type(&extension, &mut file, &metadata).await?,
 								)
-								.map_err(|err| {
-									error!("Error converting mime-type into header value: {}", err);
+								.map_err(|e| {
+									error!(?e, "Error converting mime-type into header value;");
 									internal_server_error(())
 								})?,
 							);
 
 							serve_file(file, Ok(metadata), request.into_parts().0, resp).await
 						}
-						ServeFrom::Remote(identity) => {
-							*request.uri_mut() =
-								format!("/file/{}/{}/{}", part_parts.0, part_parts.1, part_parts.2)
-									.parse()
-									.expect("url was validated by Axum");
+						ServeFrom::Remote {
+							library_identity: _,
+							node_identity,
+							library,
+						} => {
+							// TODO: Support `Range` requests and `ETag` headers
 
-							Ok(request_to_remote_node(
+							let (tx, mut rx) = tokio::sync::mpsc::channel::<io::Result<Bytes>>(150);
+							request_file(
 								state.node.p2p.p2p.clone(),
-								identity,
-								request,
+								*node_identity,
+								&library.identity,
+								file_path_pub_id,
+								Range::Full,
+								MpscToAsyncWrite::new(PollSender::new(tx)),
 							)
-							.await)
+							.await
+							.map_err(|e| {
+								error!(
+									%file_path_pub_id,
+									node_identity = ?library.identity.to_remote_identity(),
+									?e,
+									"Error requesting file from other node;",
+								);
+								internal_server_error(())
+							})?;
+
+							// TODO: Content Type
+							Ok(InfallibleResponse::builder().status(StatusCode::OK).body(
+								body::boxed(StreamBody::new(stream! {
+									while let Some(item) = rx.recv().await {
+										yield item;
+									}
+								})),
+							))
 						}
 					}
 				},
@@ -316,9 +357,9 @@ pub fn base_router() -> Router<LocalState> {
 						.then_some(())
 						.ok_or_else(|| not_found(()))?;
 
-					let mut file = File::open(&path).await.map_err(|err| {
+					let mut file = File::open(&path).await.map_err(|e| {
 						InfallibleResponse::builder()
-							.status(if err.kind() == io::ErrorKind::NotFound {
+							.status(if e.kind() == io::ErrorKind::NotFound {
 								StatusCode::NOT_FOUND
 							} else {
 								StatusCode::INTERNAL_SERVER_ERROR
@@ -332,8 +373,8 @@ pub fn base_router() -> Router<LocalState> {
 							None => "text/plain".to_string(),
 							Some(ext) => infer_the_mime_type(ext, &mut file, &metadata).await?,
 						})
-						.map_err(|err| {
-							error!("Error converting mime-type into header value: {}", err);
+						.map_err(|e| {
+							error!(?e, "Error converting mime-type into header value;");
 							internal_server_error(())
 						})?,
 					);
@@ -387,8 +428,8 @@ pub fn router(node: Arc<Node>) -> Router<()> {
 				 mut request: Request<Body>| async move {
 					let identity = match RemoteIdentity::from_str(&identity) {
 						Ok(identity) => identity,
-						Err(err) => {
-							warn!("Error parsing identity '{}': {}", identity, err);
+						Err(e) => {
+							warn!(%identity, ?e, "Error parsing identity;");
 							return (StatusCode::BAD_REQUEST, HeaderMap::new(), vec![])
 								.into_response();
 						}

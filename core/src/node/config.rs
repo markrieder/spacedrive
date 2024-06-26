@@ -1,6 +1,6 @@
 use crate::{
 	api::{notifications::Notification, BackendFeature},
-	object::media::old_thumbnail::preferences::ThumbnailerPreferences,
+	/*object::media::old_thumbnail::preferences::ThumbnailerPreferences,*/
 	util::version_manager::{Kind, ManagedVersion, VersionManager, VersionManagerError},
 };
 
@@ -8,6 +8,7 @@ use sd_p2p::Identity;
 use sd_utils::error::FileIOError;
 
 use std::{
+	collections::HashSet,
 	path::{Path, PathBuf},
 	sync::Arc,
 };
@@ -37,17 +38,75 @@ pub enum P2PDiscoveryState {
 }
 
 #[derive(Debug, Default, Clone, Copy, Serialize, Deserialize, Type)]
-#[serde(rename_all = "snake_case", untagged)]
+#[serde(rename_all = "snake_case", tag = "type", content = "value")]
 pub enum Port {
-	Disabled,
 	#[default]
 	Random,
 	Discrete(u16),
 }
 
 impl Port {
-	pub fn is_random(&self) -> bool {
+	pub fn get(&self) -> u16 {
+		if is_in_docker() {
+			return 7373;
+		}
+
+		match self {
+			Port::Random => 0,
+			Port::Discrete(port) => *port,
+		}
+	}
+
+	pub fn is_default(&self) -> bool {
 		matches!(self, Port::Random)
+	}
+}
+
+pub fn is_in_docker() -> bool {
+	std::env::var("SD_DOCKER").as_deref() == Ok("true")
+}
+
+fn skip_if_false(value: &bool) -> bool {
+	!*value
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+pub struct NodeConfigP2P {
+	#[serde(default)]
+	pub discovery: P2PDiscoveryState,
+	#[serde(default, skip_serializing_if = "Port::is_default")]
+	pub port: Port,
+	#[serde(default, skip_serializing_if = "skip_if_false")]
+	pub disabled: bool,
+	#[serde(default, skip_serializing_if = "skip_if_false")]
+	pub disable_ipv6: bool,
+	#[serde(default, skip_serializing_if = "skip_if_false")]
+	pub disable_relay: bool,
+	#[serde(default, skip_serializing_if = "skip_if_false")]
+	pub enable_remote_access: bool,
+	/// A list of peer addresses to try and manually connect to, instead of relying on discovery.
+	///
+	/// All of these are valid values:
+	///  - `localhost`
+	///  - `otbeaumont.me` or `otbeaumont.me:3000`
+	///  - `127.0.0.1` or `127.0.0.1:300`
+	///  - `[::1]` or `[::1]:3000`
+	/// which is why we use `String` not `SocketAddr`
+	#[serde(default)]
+	pub manual_peers: HashSet<String>,
+}
+
+impl Default for NodeConfigP2P {
+	fn default() -> Self {
+		Self {
+			discovery: P2PDiscoveryState::Everyone,
+			port: Port::Random,
+			disabled: true,
+			disable_ipv6: true,
+			disable_relay: true,
+			enable_remote_access: false,
+			manual_peers: Default::default(),
+		}
 	}
 }
 
@@ -66,12 +125,8 @@ pub struct NodeConfig {
 	#[serde(with = "identity_serde")]
 	pub identity: Identity,
 	/// P2P config
-	#[serde(default, skip_serializing_if = "Port::is_random")]
-	pub p2p_ipv4_port: Port,
-	#[serde(default, skip_serializing_if = "Port::is_random")]
-	pub p2p_ipv6_port: Port,
 	#[serde(default)]
-	pub p2p_discovery: P2PDiscoveryState,
+	pub p2p: NodeConfigP2P,
 	/// Feature flags enabled on the node
 	#[serde(default)]
 	pub features: Vec<BackendFeature>,
@@ -114,7 +169,8 @@ mod identity_serde {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq, Type)]
 pub struct NodePreferences {
-	pub thumbnailer: ThumbnailerPreferences,
+	// pub thumbnailer: ThumbnailerPreferences,
+	// TODO(fogodev): introduce preferences to choose how many worker the task system should have
 }
 
 #[derive(
@@ -138,7 +194,11 @@ impl ManagedVersion<NodeConfigVersion> for NodeConfig {
 			// SAFETY: This is just for display purposes so it doesn't matter if it's lossy
 			Ok(hostname) => hostname.to_string_lossy().into_owned(),
 			Err(e) => {
-				error!("Falling back to default node name as an error occurred getting your systems hostname: '{e:#?}'");
+				error!(
+					?e,
+					"Falling back to default node name as an error occurred getting your systems hostname;",
+				);
+
 				"my-spacedrive".into()
 			}
 		};
@@ -153,9 +213,7 @@ impl ManagedVersion<NodeConfigVersion> for NodeConfig {
 			id: Uuid::new_v4(),
 			name,
 			identity: Identity::default(),
-			p2p_ipv4_port: Port::Random,
-			p2p_ipv6_port: Port::Random,
-			p2p_discovery: P2PDiscoveryState::Everyone,
+			p2p: NodeConfigP2P::default(),
 			version: Self::LATEST_VERSION,
 			features: vec![],
 			notifications: vec![],
@@ -256,7 +314,7 @@ impl NodeConfig {
 					}
 
 					_ => {
-						error!("Node config version is not handled: {:?}", current);
+						error!(current_version = ?current, "Node config version is not handled;");
 						return Err(VersionManagerError::UnexpectedMigration {
 							current_version: current.int_value(),
 							next_version: next.int_value(),
@@ -323,11 +381,6 @@ impl Manager {
 	/// get will return the current NodeConfig in a read only state.
 	pub(crate) async fn get(&self) -> NodeConfig {
 		self.config.read().await.clone()
-	}
-
-	/// get a node config preferences watcher receiver
-	pub(crate) fn preferences_watcher(&self) -> watch::Receiver<NodePreferences> {
-		self.preferences_watcher_tx.subscribe()
 	}
 
 	/// data_directory returns the path to the directory storing the configuration data.

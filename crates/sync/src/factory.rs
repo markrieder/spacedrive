@@ -21,7 +21,10 @@ pub trait OperationFactory {
 	fn get_clock(&self) -> &HLC;
 	fn get_instance(&self) -> Uuid;
 
-	fn new_op<TSyncId: SyncId>(&self, id: &TSyncId, data: CRDTOperationData) -> CRDTOperation {
+	fn new_op<TSyncId: SyncId>(&self, id: &TSyncId, data: CRDTOperationData) -> CRDTOperation
+	where
+		TSyncId::Model: crate::SyncModel,
+	{
 		let timestamp = self.get_clock().new_timestamp();
 
 		CRDTOperation {
@@ -38,18 +41,15 @@ pub trait OperationFactory {
 		id: TSyncId,
 		values: impl IntoIterator<Item = (&'static str, rmpv::Value)> + 'static,
 	) -> Vec<CRDTOperation> {
-		[self.new_op(&id, CRDTOperationData::Create)]
-			.into_iter()
-			.chain(values.into_iter().map(|(name, value)| {
-				self.new_op(
-					&id,
-					CRDTOperationData::Update {
-						field: name.to_string(),
-						value,
-					},
-				)
-			}))
-			.collect()
+		vec![self.new_op(
+			&id,
+			CRDTOperationData::Create(
+				values
+					.into_iter()
+					.map(|(name, value)| (name.to_string(), value))
+					.collect(),
+			),
+		)]
 	}
 	fn shared_update<TSyncId: SyncId<Model = TModel>, TModel: SharedSyncModel>(
 		&self,
@@ -77,18 +77,15 @@ pub trait OperationFactory {
 		id: TSyncId,
 		values: impl IntoIterator<Item = (&'static str, rmpv::Value)> + 'static,
 	) -> Vec<CRDTOperation> {
-		[self.new_op(&id, CRDTOperationData::Create)]
-			.into_iter()
-			.chain(values.into_iter().map(|(name, value)| {
-				self.new_op(
-					&id,
-					CRDTOperationData::Update {
-						field: name.to_string(),
-						value,
-					},
-				)
-			}))
-			.collect()
+		vec![self.new_op(
+			&id,
+			CRDTOperationData::Create(
+				values
+					.into_iter()
+					.map(|(name, value)| (name.to_string(), value))
+					.collect(),
+			),
+		)]
 	}
 	fn relation_update<TSyncId: RelationSyncId<Model = TModel>, TModel: RelationSyncModel>(
 		&self,

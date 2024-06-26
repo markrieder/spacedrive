@@ -6,13 +6,12 @@ use crate::{
 };
 
 use sd_p2p_proto::{decode, encode};
-use sd_sync::CRDTOperation;
+use sd_sync::CompressedCRDTOperations;
 
 use std::sync::Arc;
 
 use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
 use tracing::*;
-use uuid::Uuid;
 
 use super::P2PManager;
 
@@ -28,10 +27,11 @@ mod originator {
 	use sd_p2p_tunnel::Tunnel;
 
 	pub mod tx {
+
 		use super::*;
 
 		#[derive(Debug, PartialEq)]
-		pub struct Operations(pub Vec<CRDTOperation>);
+		pub struct Operations(pub CompressedCRDTOperations);
 
 		impl Operations {
 			// TODO: Per field errors for better error handling
@@ -56,8 +56,11 @@ mod originator {
 		#[cfg(test)]
 		#[tokio::test]
 		async fn test() {
+			use sd_sync::CRDTOperation;
+			use uuid::Uuid;
+
 			{
-				let original = Operations(vec![]);
+				let original = Operations(CompressedCRDTOperations::new(vec![]));
 
 				let mut cursor = std::io::Cursor::new(original.to_bytes());
 				let result = Operations::from_stream(&mut cursor).await.unwrap();
@@ -65,13 +68,13 @@ mod originator {
 			}
 
 			{
-				let original = Operations(vec![CRDTOperation {
+				let original = Operations(CompressedCRDTOperations::new(vec![CRDTOperation {
 					instance: Uuid::new_v4(),
 					timestamp: sync::NTP64(0),
 					record_id: rmpv::Value::Nil,
 					model: 0,
-					data: sd_sync::CRDTOperationData::Create,
-				}]);
+					data: sd_sync::CRDTOperationData::create(),
+				}]));
 
 				let mut cursor = std::io::Cursor::new(original.to_bytes());
 				let result = Operations::from_stream(&mut cursor).await.unwrap();
@@ -80,28 +83,33 @@ mod originator {
 		}
 	}
 
+	#[instrument(skip(sync, p2p))]
 	/// REMEMBER: This only syncs one direction!
-	pub async fn run(library_id: Uuid, sync: &Arc<sync::Manager>, p2p: &Arc<super::P2PManager>) {
-		for (remote_identity, peer) in p2p.get_library_instances(&library_id) {
+	pub async fn run(
+		library: Arc<Library>,
+		sync: &Arc<sync::Manager>,
+		p2p: &Arc<super::P2PManager>,
+	) {
+		for (remote_identity, peer) in p2p.get_library_instances(&library.id) {
 			if !peer.is_connected() {
 				continue;
 			};
 
 			let sync = sync.clone();
 
+			let library = library.clone();
 			tokio::spawn(async move {
 				debug!(
-					"Alerting peer '{remote_identity:?}' of new sync events for library '{library_id:?}'"
+					?remote_identity,
+					%library.id,
+					"Alerting peer of new sync events for library;"
 				);
 
 				let mut stream = peer.new_stream().await.unwrap();
 
-				stream
-					.write_all(&Header::Sync(library_id).to_bytes())
-					.await
-					.unwrap();
+				stream.write_all(&Header::Sync.to_bytes()).await.unwrap();
 
-				let mut tunnel = Tunnel::initiator(stream).await.unwrap();
+				let mut tunnel = Tunnel::initiator(stream, &library.identity).await.unwrap();
 
 				tunnel
 					.write_all(&SyncMessage::NewOperations.to_bytes())
@@ -115,7 +123,7 @@ mod originator {
 					let ops = sync.get_ops(args).await.unwrap();
 
 					tunnel
-						.write_all(&tx::Operations(ops).to_bytes())
+						.write_all(&tx::Operations(CompressedCRDTOperations::new(ops)).to_bytes())
 						.await
 						.unwrap();
 					tunnel.flush().await.unwrap();
@@ -217,10 +225,9 @@ mod responder {
 			let timestamps = match req {
 				Request::FinishedIngesting => break,
 				Request::Messages { timestamps, .. } => timestamps,
-				_ => continue,
 			};
 
-			debug!("Getting ops for timestamps {timestamps:?}");
+			debug!(?timestamps, "Getting ops for timestamps;");
 
 			stream
 				.write_all(
@@ -236,15 +243,20 @@ mod responder {
 
 			let rx::Operations(ops) = rx::Operations::from_stream(stream).await.unwrap();
 
+			let (wait_tx, wait_rx) = tokio::sync::oneshot::channel::<()>();
+
 			ingest
 				.event_tx
 				.send(Event::Messages(MessagesEvent {
 					instance_id: library.sync.instance,
 					has_more: ops.len() == OPS_PER_REQUEST as usize,
 					messages: ops,
+					wait_tx: Some(wait_tx),
 				}))
 				.await
 				.expect("TODO: Handle ingest channel closed, so we don't loose ops");
+
+			wait_rx.await.unwrap()
 		}
 
 		debug!("Sync responder done");

@@ -1,5 +1,6 @@
 use sd_core_sync::*;
-use sd_prisma::prisma;
+use sd_prisma::prisma::{self};
+use sd_sync::CompressedCRDTOperations;
 use sd_utils::uuid_to_bytes;
 
 use prisma_client_rust::chrono::Utc;
@@ -35,7 +36,7 @@ impl Instance {
 
 		db.instance()
 			.create(
-				uuid_to_bytes(id),
+				uuid_to_bytes(&id),
 				vec![],
 				vec![],
 				Utc::now().into(),
@@ -51,7 +52,9 @@ impl Instance {
 			id,
 			&Arc::new(AtomicBool::new(true)),
 			Default::default(),
-		);
+			&Default::default(),
+		)
+		.await;
 
 		Arc::new(Self {
 			id,
@@ -70,7 +73,7 @@ impl Instance {
 			left.db
 				.instance()
 				.create(
-					uuid_to_bytes(right.id),
+					uuid_to_bytes(&right.id),
 					vec![],
 					vec![],
 					Utc::now().into(),
@@ -122,16 +125,17 @@ impl Instance {
 								ingest
 									.event_tx
 									.send(ingest::Event::Messages(ingest::MessagesEvent {
-										messages,
+										messages: CompressedCRDTOperations::new(messages),
 										has_more: false,
 										instance_id: instance1.id,
+										wait_tx: None,
 									}))
 									.await
 									.unwrap();
 							}
-							ingest::Request::Ingested => {
-								instance2.sync.tx.send(SyncMessage::Ingested).ok();
-							}
+							// ingest::Request::Ingested => {
+							// 	instance2.sync.tx.send(SyncMessage::Ingested).ok();
+							// }
 							ingest::Request::FinishedIngesting => {}
 						}
 					}

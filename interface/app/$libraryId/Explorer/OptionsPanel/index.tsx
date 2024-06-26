@@ -2,7 +2,7 @@ import {
 	createOrdering,
 	explorerLayout,
 	getOrderingDirection,
-	orderingKey,
+	getOrderingKey,
 	useExplorerLayoutStore
 } from '@sd/client';
 import { RadixCheckbox, Select, SelectOption, Slider, tw, z } from '@sd/ui';
@@ -28,7 +28,7 @@ export default () => {
 				<div className="flex flex-col">
 					<Subheading>{t('sort_by')}</Subheading>
 					<Select
-						value={settings.order ? orderingKey(settings.order) : 'none'}
+						value={settings.order ? getOrderingKey(settings.order) : 'none'}
 						size="sm"
 						className="w-full"
 						onChange={(key) => {
@@ -45,7 +45,7 @@ export default () => {
 						<SelectOption value="none">{t('none')}</SelectOption>
 						{explorer.orderingKeys?.options.map((option) => (
 							<SelectOption key={option.value} value={option.value}>
-								{option.description}
+								{t(`${option.description?.toLowerCase().split(' ').join('_')}`)}
 							</SelectOption>
 						))}
 					</Select>
@@ -62,14 +62,14 @@ export default () => {
 							if (explorer.settingsStore.order === null) return;
 
 							explorer.settingsStore.order = createOrdering(
-								orderingKey(explorer.settingsStore.order),
+								getOrderingKey(explorer.settingsStore.order),
 								order
 							);
 						}}
 					>
 						{SortOrderSchema.options.map((o) => (
 							<SelectOption key={o.value} value={o.value}>
-								{o.value}
+								{o.description}
 							</SelectOption>
 						))}
 					</Select>
@@ -108,7 +108,7 @@ export default () => {
 							onValueChange={(value) => {
 								explorer.settingsStore.gridItemSize = value[0] || 100;
 							}}
-							defaultValue={[settings.gridItemSize]}
+							value={[settings.gridItemSize]}
 							max={200}
 							step={10}
 							min={60}
@@ -172,6 +172,15 @@ export default () => {
 						onCheckedChange={(value) => {
 							if (typeof value !== 'boolean') return;
 							explorerLayout.showPathBar = value;
+						}}
+					/>
+					<RadixCheckbox
+						checked={layoutStore.showTags}
+						label={t('show_tags')}
+						name="showTags"
+						onCheckedChange={(value) => {
+							if (typeof value !== 'boolean') return;
+							explorerLayout.showTags = value;
 						}}
 					/>
 

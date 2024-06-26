@@ -28,7 +28,7 @@ pub(crate) fn mount() -> AlphaRouter<Ctx> {
 		.procedure("setApiOrigin", {
 			R.mutation(|node, origin: String| async move {
 				let mut origin_env = node.env.api_url.lock().await;
-				*origin_env = origin.clone();
+				origin_env.clone_from(&origin);
 
 				node.config
 					.write(|c| {
@@ -44,6 +44,10 @@ pub(crate) fn mount() -> AlphaRouter<Ctx> {
 }
 
 mod library {
+	use std::str::FromStr;
+
+	use sd_p2p::RemoteIdentity;
+
 	use crate::util::MaybeUndefined;
 
 	use super::*;
@@ -75,6 +79,7 @@ mod library {
 							library.instance_uuid,
 							library.identity.to_remote_identity(),
 							node_config.id,
+							node_config.identity.to_remote_identity(),
 							&node.p2p.peer_metadata(),
 						)
 						.await?;
@@ -139,6 +144,7 @@ mod library {
 						library.instance_uuid,
 						library.identity.to_remote_identity(),
 						node_config.id,
+						node_config.identity.to_remote_identity(),
 						node.p2p.peer_metadata(),
 					)
 					.await?;
@@ -149,10 +155,12 @@ mod library {
 							&library.db,
 							&library.sync,
 							&node.libraries,
-							instance.uuid,
+							&instance.uuid,
 							instance.identity,
-							instance.node_id,
-							node.p2p.peer_metadata(),
+							&instance.node_id,
+							RemoteIdentity::from_str(&instance.node_remote_identity)
+								.expect("malformed remote identity in the DB"),
+							instance.metadata,
 						)
 						.await?;
 					}
@@ -296,8 +304,8 @@ mod locations {
 						.body(ByteStream::from_body_0_4(Full::from("Hello, world!")))
 						.send()
 						.await
-						.map_err(|err| {
-							tracing::error!("S3 error: {err:?}");
+						.map_err(|e| {
+							tracing::error!(?e, "S3 error;");
 							rspc::Error::new(
 								rspc::ErrorCode::InternalServerError,
 								"Failed to upload to S3".to_string(),
