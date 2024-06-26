@@ -86,18 +86,18 @@ const LibraryStats = () => {
 
 	const StatItemNames: Partial<Record<keyof Statistics, string>> = {
 		total_library_bytes: t('library_bytes'),
-		total_local_bytes_capacity: t('total_bytes_capacity'),
-		total_local_bytes_free: t('total_bytes_free'),
 		library_db_size: t('library_db_size'),
-		total_library_preview_media_bytes: t('preview_media_bytes')
+		total_library_preview_media_bytes: t('preview_media_bytes'),
+		total_local_bytes_capacity: t('total_bytes_capacity'),
+		total_local_bytes_free: t('total_bytes_free')
 	};
 
 	const StatDescriptions: Partial<Record<keyof Statistics, string>> = {
 		total_library_bytes: t('library_bytes_description'),
-		total_local_bytes_capacity: t('total_bytes_capacity_description'),
-		total_local_bytes_free: t('total_bytes_free_description'),
 		library_db_size: t('library_db_size_description'),
-		total_library_preview_media_bytes: t('preview_media_bytes_description')
+		total_library_preview_media_bytes: t('preview_media_bytes_description'),
+		total_local_bytes_capacity: t('total_bytes_capacity_description'),
+		total_local_bytes_free: t('total_bytes_free_description')
 	};
 
 	const displayableStatItems = Object.keys(
@@ -113,6 +113,7 @@ const LibraryStats = () => {
 	const totalUsedSpace = Number(statistics.total_local_bytes_used);
 
 	// Define the major categories and aggregate the "Other" category
+	// TODO: edit to use library size as total capacity and split bar into major categories without system data
 	const majorCategories = ['Document', 'Text', 'Image', 'Video'];
 	const aggregatedData = (storageBarData ?? []).reduce(
 		(acc, curr) => {
@@ -165,7 +166,7 @@ const LibraryStats = () => {
 
 	return (
 		<Card className="flex h-[220px] w-[750px] shrink-0 flex-col bg-app-box/50">
-			<div className="mb-1 flex overflow-hidden p-4">
+			<div className="flex overflow-hidden p-4">
 				{Object.entries(statistics)
 					.sort(
 						([a], [b]) =>

@@ -3,7 +3,7 @@ import { humanizeSize } from '@sd/client';
 import { Tooltip } from '@sd/ui';
 import { useIsDark } from '~/hooks';
 
-const BARWIDTH = 700;
+const BARWIDTH = 750;
 
 const lightenColor = (color: string, percent: number) => {
 	const num = parseInt(color.replace('#', ''), 16);
@@ -109,7 +109,7 @@ const StorageBar: React.FC<StorageBarProps> = ({ sections, totalSpace }) => {
 				{sections.map((section, index) => (
 					<Tooltip key={index} label={section.tooltip} position="top">
 						<div
-							className="mb-2 mr-6 flex items-center"
+							className="mb-2 mr-8 flex items-center"
 							onMouseEnter={() => setHoveredSectionIndex(index)}
 							onMouseLeave={() => setHoveredSectionIndex(null)}
 						>

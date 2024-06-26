@@ -715,7 +715,7 @@
   "toggle_sidebar": "تبديل الشريط الجانبي",
   "tools": "أدوات",
   "total_bytes_capacity": "Total capacity",
-  "total_bytes_capacity_description": "The total capacity of all nodes connected to the library. May show incorrect values during alpha.",
+  "total_bytes_capacity_description": "The total capacity of the current nodes connected to the library. May show incorrect values during alpha.",
   "total_bytes_free": "Free space",
   "total_bytes_free_description": "Free space available on all nodes connected to the library.",
   "total_bytes_used": "Total used space",
