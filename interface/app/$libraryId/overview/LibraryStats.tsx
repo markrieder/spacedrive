@@ -115,7 +115,7 @@ const LibraryStats = () => {
 	}
 
 	const { statistics } = stats.data;
-	const totalSpace = Number(statistics.total_local_bytes_capacity);
+	const totalSpace = Number(statistics.total_library_bytes);
 	const totalUsedSpace = Number(statistics.total_local_bytes_used);
 
 	// Define the major categories and aggregate the "Other" category
@@ -146,11 +146,11 @@ const LibraryStats = () => {
 
 	const sections: Section[] = Object.entries(aggregatedData).map(([name, data], index) => {
 		const colors = [
+			'#6D90B9', // Gray
 			'#3A7ECC', // Slightly Darker Blue 400
-			'#AAAAAA', // Gray
 			'#004C99', // Tailwind Blue 700
 			'#2563EB', // Tailwind Blue 500
-			'#00274D' // Dark Navy Blue,
+			'#004C99' // Dark Navy Blue,
 		];
 
 		const color = colors[index % colors.length] || '#8F8F8F'; // Use a default color if colors array is empty
@@ -160,14 +160,6 @@ const LibraryStats = () => {
 			color,
 			tooltip: `${name}`
 		};
-	});
-
-	// Add System Data section
-	sections.push({
-		name: 'System Data',
-		value: systemDataBytes,
-		color: '#2F3038', // Gray for System Data
-		tooltip: 'System data that exists outside of your Spacedrive library'
 	});
 
 	return (

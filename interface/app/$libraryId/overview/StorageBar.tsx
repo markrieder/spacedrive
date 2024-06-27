@@ -44,27 +44,24 @@ const StorageBar: React.FC<StorageBarProps> = ({ sections, totalSpace }) => {
 		return `${pixvalue.toFixed(2)}px`;
 	};
 
-	const usedSpace = sections.reduce((acc, section) => acc + section.value, 0);
-	const unusedSpace = totalSpace - usedSpace;
-
-	const nonSystemSections = sections.filter((section) => section.name !== 'System Data');
-	const systemSection = sections.find((section) => section.name === 'System Data');
+	// Sort sections by value from smallest to largest
+	const sortedSections = sections.sort((a, b) => a.value - b.value);
 
 	return (
 		<div className="w-auto p-3">
 			<div className="relative mt-1 flex h-6 overflow-hidden rounded">
-				{nonSystemSections.map((section, index) => {
+				{sortedSections.map((section, index) => {
 					const humanizedValue = humanizeSize(section.value);
 					const isHovered = hoveredSectionIndex === index;
 
 					return (
 						<Tooltip
 							key={index}
-							label={`${humanizedValue.value} ${humanizedValue.unit}`}
+							label={section.tooltip} // Swapped with the tooltip from the second Tooltip component
 							position="top"
 						>
 							<div
-								className={`relative h-full`}
+								className="relative h-full"
 								style={{
 									width: getPercentage(section.value),
 									minWidth: '2px', // Ensure very small sections are visible
@@ -79,35 +76,14 @@ const StorageBar: React.FC<StorageBarProps> = ({ sections, totalSpace }) => {
 						</Tooltip>
 					);
 				})}
-				{unusedSpace > 0 && (
-					<div
-						className="relative h-full"
-						style={{
-							width: getPercentage(unusedSpace),
-							backgroundColor: isDark ? '#1C1D25' : '#D3D3D3'
-						}}
-					/>
-				)}
-				{systemSection && (
-					<Tooltip
-						label={`${humanizeSize(systemSection.value).value} ${humanizeSize(systemSection.value).unit}`}
-						position="top"
-					>
-						<div
-							className="relative h-full rounded-r"
-							style={{
-								width: getPercentage(systemSection.value),
-								minWidth: '2px',
-								backgroundColor: systemSection.color,
-								transition: 'background-color 0.3s ease-in-out'
-							}}
-						/>
-					</Tooltip>
-				)}
 			</div>
 			<div className={`mt-6 flex flex-wrap ${isDark ? 'text-ink-dull' : 'text-gray-800'}`}>
-				{sections.map((section, index) => (
-					<Tooltip key={index} label={section.tooltip} position="top">
+				{sortedSections.map((section, index) => (
+					<Tooltip
+						key={index}
+						label={`${humanizeSize(section.value).value} ${humanizeSize(section.value).unit}`}
+						position="top"
+					>
 						<div
 							className="mb-2 mr-8 flex items-center"
 							onMouseEnter={() => setHoveredSectionIndex(index)}
