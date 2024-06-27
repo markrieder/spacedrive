@@ -1,7 +1,13 @@
 import { Info } from '@phosphor-icons/react';
 import clsx from 'clsx';
 import { useEffect, useState } from 'react';
-import { humanizeSize, Statistics, useLibraryContext, useLibraryQuery } from '@sd/client';
+import {
+	humanizeSize,
+	Statistics,
+	uint32ArrayToBigInt,
+	useLibraryContext,
+	useLibraryQuery
+} from '@sd/client';
 import { Card, Tooltip } from '@sd/ui';
 import { useCounter, useIsDark, useLocale } from '~/hooks';
 
@@ -9,7 +15,7 @@ import StorageBar from './StorageBar';
 
 interface StatItemProps {
 	title: string;
-	bytes: bigint;
+	bytes: number;
 	isLoading: boolean;
 	info?: string;
 }
@@ -121,7 +127,7 @@ const LibraryStats = () => {
 			if (!acc[category]) {
 				acc[category] = { total_bytes: 0 };
 			}
-			acc[category]!.total_bytes += curr.total_bytes[1];
+			acc[category]!.total_bytes += Number(uint32ArrayToBigInt(curr.total_bytes));
 			return acc;
 		},
 		{} as Record<string, { total_bytes: number }>
@@ -178,7 +184,7 @@ const LibraryStats = () => {
 							<StatItem
 								key={`${library.uuid} ${key}`}
 								title={StatItemNames[key as keyof Statistics]!}
-								bytes={BigInt(value as number)}
+								bytes={value as number}
 								isLoading={stats.isLoading}
 								info={StatDescriptions[key as keyof Statistics]}
 							/>
