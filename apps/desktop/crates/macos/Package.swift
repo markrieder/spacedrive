@@ -6,7 +6,7 @@ import PackageDescription
 let package = Package(
     name: "sd-desktop-macos",
     platforms: [
-        .macOS(.v10_15), // macOS Catalina. Earliest version that is officially supported by Apple.
+        .macOS(.v10_15)  // macOS Catalina. Earliest version that is officially supported by Apple.
     ],
     products: [
         // Products define the executables and libraries a package produces, and make them visible to other packages.
@@ -14,11 +14,11 @@ let package = Package(
             name: "sd-desktop-macos",
             type: .static,
             targets: ["sd-desktop-macos"]
-        ),
+        )
     ],
     dependencies: [
         // Dependencies declare other packages that this package depends on.
-        .package(url: "https://github.com/brendonovich/swift-rs", branch: "specta"),
+        .package(url: "https://github.com/brendonovich/swift-rs", branch: "specta")
     ],
     targets: [
         // Targets are the basic building blocks of a package. A target can define a module or a test suite.
@@ -26,8 +26,9 @@ let package = Package(
         .target(
             name: "sd-desktop-macos",
             dependencies: [
-                .product(name: "SwiftRs", package: "swift-rs")	],
+                .product(name: "SwiftRs", package: "swift-rs")
+            ],
             path: "src-swift"
-        ),
+        )
     ]
 )
