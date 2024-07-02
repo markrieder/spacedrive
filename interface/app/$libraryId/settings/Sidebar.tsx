@@ -41,19 +41,21 @@ export default () => {
 	const { t } = useLocale();
 
 	return (
-		<div className="custom-scroll no-scrollbar h-full w-60 max-w-[180px] shrink-0 border-r border-app-line/50 pb-5">
-			{platform === 'tauri' ? (
-				<div
-					data-tauri-drag-region={os === 'macOS'}
-					className={clsx(
-						'mb-3 flex h-3 w-full p-3 pl-[14px] pt-[11px]',
-						sidebar.collapsed && os === 'macOS' && 'justify-end'
+		<div className="custom-scroll no-scrollbar relative h-full w-60 max-w-[180px] shrink-0 border-r border-app-line/50 pb-5 pt-3">
+			{platform === 'tauri' && (
+				<>
+					<div data-tauri-drag-region={os === 'macOS'} className="absolute h-12 w-full" />
+					{os !== 'windows' && (
+						<div
+							className={clsx(
+								'mb-3 flex w-full p-3 pl-[14px] pt-0',
+								sidebar.collapsed && os === 'macOS' && 'justify-end'
+							)}
+						>
+							<NavigationButtons />
+						</div>
 					)}
-				>
-					{os !== 'windows' && <NavigationButtons />}
-				</div>
-			) : (
-				<div className="h-3" />
+				</>
 			)}
 
 			<div className="space-y-6 px-4 py-3">
