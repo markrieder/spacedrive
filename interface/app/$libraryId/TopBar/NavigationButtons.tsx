@@ -58,7 +58,7 @@ export const NavigationButtons = () => {
 	}, [navigate, os, canGoBack, canGoForward]);
 
 	return (
-		<div data-tauri-drag-region={os === 'macOS'} className="flex">
+		<div className="flex">
 			<Tooltip keybinds={[icon, '[']} label={t('navigate_back')}>
 				<TopBarButton
 					rounding="left"
