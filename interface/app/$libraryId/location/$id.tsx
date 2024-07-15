@@ -6,6 +6,7 @@ import {
 	FilePathOrder,
 	filePathOrderingKeysSchema,
 	Location,
+	useBridgeQuery,
 	useLibraryQuery,
 	useLibrarySubscription,
 	useOnlineLocations
@@ -108,6 +109,8 @@ const LocationExplorer = ({ location }: { location: Location; path?: string }) =
 		parent: { type: 'Location', location }
 	});
 
+	const instanceData = useLibraryQuery(['locations.getInstance', location.instance_id ?? 0]);
+
 	useLibrarySubscription(
 		['locations.quickRescan', { sub_path: path ?? '', location_id: location.id }],
 		{ onData() {} }
@@ -132,6 +135,12 @@ const LocationExplorer = ({ location }: { location: Location; path?: string }) =
 	const isLocationIndexing = useIsLocationIndexing(location.id);
 
 	const { t } = useLocale();
+	console.log(
+		'[DEBUG -> LocationExplorer] location (Instance ID):',
+		location.name,
+		location.instance_id
+	);
+	console.log('[DEBUG -> LocationExplorer] location (Instance Data):', instanceData.data);
 
 	return (
 		<ExplorerContextProvider explorer={explorer}>

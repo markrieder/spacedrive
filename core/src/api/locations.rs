@@ -15,7 +15,10 @@ use sd_core_prisma_helpers::{
 	file_path_for_frontend, label_with_objects, location_with_indexer_rules, object_with_file_paths,
 };
 
-use sd_prisma::prisma::{file_path, indexer_rule, indexer_rules_in_location, location, SortOrder};
+use sd_p2p::RemoteIdentity;
+use sd_prisma::prisma::{
+	file_path, indexer_rule, indexer_rules_in_location, instance, location, SortOrder,
+};
 
 use std::path::{Path, PathBuf};
 
@@ -463,6 +466,39 @@ pub(crate) fn mount() -> AlphaRouter<Ctx> {
 					)
 				})
 			})
+		})
+		.procedure("getInstance", {
+			R.with2(library())
+				.query(|(_, library), instance_id: instance::id::Type| async move {
+					let instance = library
+						.db
+						.instance()
+						.find_unique(instance::id::equals(instance_id))
+						.exec()
+						.await?
+						.ok_or_else(|| {
+							rspc::Error::new(
+								ErrorCode::NotFound,
+								format!("Instance <id={instance_id}> not found"),
+							)
+						})?;
+
+					debug!(%instance_id, "Found instance");
+					debug!(?instance, "Instance data");
+
+					let remote_identity_string =
+						RemoteIdentity::from_bytes(&instance.remote_identity).map_err(|e| {
+							rspc::Error::with_cause(
+								ErrorCode::InternalServerError,
+								"Failed to parse remote identity".to_string(),
+								e,
+							)
+						})?;
+
+					debug!(?remote_identity_string, "Remote identity string");
+
+					Ok(())
+				})
 		})
 		.merge("indexer_rules.", mount_indexer_rule_routes())
 }
