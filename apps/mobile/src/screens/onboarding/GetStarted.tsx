@@ -3,14 +3,15 @@ import { AppLogo, BloomOne } from '@sd/assets/images';
 import SdMobIntro from '@sd/assets/videos/SdMobIntro.mp4';
 import { ResizeMode, Video } from 'expo-av';
 import * as Haptics from 'expo-haptics';
-import { Image } from 'expo-image';
+import FastImage from 'react-native-fast-image';
+
+import { useOnboardingStore } from '@sd/client';
 import { MotiView } from 'moti';
 import { CaretLeft } from 'phosphor-react-native';
 import { useEffect } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useOnboardingStore } from '@sd/client';
 import { FadeInUpAnimation, LogoAnimation } from '~/components/animation/layout';
 import { AnimatedButton } from '~/components/primitive/Button';
 import { styled, tw, twStyle } from '~/lib/tailwind';
@@ -67,7 +68,7 @@ export function OnboardingContainer({ children }: React.PropsWithChildren) {
 						</Text>
 					</View>
 					{/* Bloom */}
-					<Image
+					<FastImage
 						source={BloomOne}
 						style={tw`top-100 absolute h-screen w-screen opacity-20`}
 					/>
@@ -98,7 +99,7 @@ const GetStartedScreen = ({ navigation }: OnboardingStackScreenProps<'GetStarted
 		<OnboardingContainer>
 			{/* Logo */}
 			<LogoAnimation style={tw`items-center`}>
-				<Image source={AppLogo} style={tw`h-30 w-30`} />
+				<FastImage source={AppLogo} style={tw`h-30 w-30`} />
 			</LogoAnimation>
 			{/* Title */}
 			<FadeInUpAnimation delay={500} style={tw`mt-8`}>

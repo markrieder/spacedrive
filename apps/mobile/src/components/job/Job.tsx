@@ -1,3 +1,4 @@
+import { JobProgressEvent, Report, useJobInfo } from '@sd/client';
 import {
 	Copy,
 	Fingerprint,
@@ -10,7 +11,6 @@ import {
 } from 'phosphor-react-native';
 import { memo } from 'react';
 import { View, ViewStyle } from 'react-native';
-import { JobProgressEvent, Report, useJobInfo } from '@sd/client';
 import { tw, twStyle } from '~/lib/tailwind';
 
 import { ProgressBar } from '../animation/ProgressBar';
@@ -24,13 +24,13 @@ type JobProps = {
 };
 
 const JobIcon: Record<string, Icon> = {
-	indexer: Folder,
-	media_processor: Image,
-	file_identifier: Fingerprint,
-	file_copier: Copy,
-	file_deleter: Trash,
-	file_cutter: Scissors,
-	object_validator: Fingerprint
+	Indexer: Folder,
+	MediaProcessor: Image,
+	FileIdentifier: Fingerprint,
+	FileCopier: Copy,
+	FileDeleter: Trash,
+	FileCutter: Scissors,
+	ObjectValidator: Fingerprint
 };
 
 function Job({ job, isChild, progress, containerStyle }: JobProps) {

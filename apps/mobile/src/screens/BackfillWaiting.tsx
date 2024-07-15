@@ -1,6 +1,12 @@
 import { useNavigation } from '@react-navigation/native';
 import { AppLogo } from '@sd/assets/images';
+<<<<<<< Updated upstream
 import { Image } from 'expo-image';
+=======
+import { useLibraryMutation, useLibraryQuery } from '@sd/client';
+import FastImage from 'react-native-fast-image';
+
+>>>>>>> Stashed changes
 import React, { useEffect } from 'react';
 import { Dimensions, Text, View } from 'react-native';
 import Animated, {
@@ -79,7 +85,7 @@ const BackfillWaiting = () => {
 					<Circle cx="50" cy="50" r="50" fill="url(#grad)" />
 				</Svg>
 			</Animated.View>
-			<Image source={AppLogo} style={tw`mb-4 h-[100px] w-[100px]`} />
+			<FastImage source={AppLogo} style={tw`mb-4 h-[100px] w-[100px]`} />
 			<Text style={tw`mx-10 mb-4 text-center text-md leading-6 text-ink`}>
 				Library is being backfilled right now for Sync!
 				<Text style={tw`font-bold`}> Please hold </Text>

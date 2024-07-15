@@ -1,10 +1,9 @@
-import { Image } from 'expo-image';
+import { TextItems } from '@sd/client';
 import { Icon } from 'phosphor-react-native';
 import { Fragment } from 'react';
 import { Text, View, ViewStyle } from 'react-native';
-import { TextItems } from '@sd/client';
+import FastImage from 'react-native-fast-image';
 import { styled, tw, twStyle } from '~/lib/tailwind';
-
 type JobContainerProps = {
 	name: string;
 	icon?: string | Icon;
@@ -31,7 +30,7 @@ export default function JobContainer(props: JobContainerProps) {
 			)}
 		>
 			{typeof Icon === 'number' ? (
-				<Image source={Icon} style={tw`relative z-40 ml-4 mr-1 h-8 w-8`} />
+				<FastImage source={Icon} style={tw`relative z-40 ml-4 mr-1 h-8 w-8`} />
 			) : (
 				Icon && (
 					<View

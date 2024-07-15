@@ -10,6 +10,12 @@ import {
 	ThumbKey,
 	type ExplorerItem
 } from '@sd/client';
+<<<<<<< Updated upstream
+=======
+import { useEffect, useLayoutEffect, useMemo, useState, type PropsWithChildren } from 'react';
+import { View } from 'react-native';
+import FastImage from 'react-native-fast-image';
+>>>>>>> Stashed changes
 import { flattenThumbnailKey, useExplorerStore } from '~/stores/explorerStore';
 
 import { tw } from '../../lib/tailwind';
@@ -82,8 +88,6 @@ export default function FileThumb({ size = 1, ...props }: FileThumbProps) {
 
 		if (locationData) {
 			setThumbType(ThumbType.Location);
-			// } else if (props.loadOriginal) {
-			// 	setThumbType(ThumbType.Original);
 		} else if (itemData.hasLocalThumbnail) {
 			setThumbType(ThumbType.Thumbnail);
 		} else {
@@ -93,28 +97,8 @@ export default function FileThumb({ size = 1, ...props }: FileThumbProps) {
 
 	// This sets the src to the thumbnail url
 	useEffect(() => {
-		const { casId, kind, isDir, extension, locationId, thumbnailKey } = itemData;
-
-		// ???
-		// const locationId =
-		// 	itemLocationId ?? (parent?.type === 'Location' ? parent.location.id : null);
-
+		const { casId, kind, isDir, extension, thumbnailKey } = itemData;
 		switch (thumbType) {
-			// case ThumbType.Original:
-			// 	if (locationId) {
-			// 		setSrc(
-			// 			platform.getFileUrl(
-			// 				library.uuid,
-			// 				locationId,
-			// 				filePath?.id || props.data.item.id,
-			// 				// Workaround Linux webview not supporting playing video and audio through custom protocol urls
-			// 				kind == 'Video' || kind == 'Audio'
-			// 			)
-			// 		);
-			// 	} else {
-			// 		setThumbType(ThumbType.Thumbnail);
-			// 	}
-			// 	break;
 			case ThumbType.Thumbnail:
 				if (casId && thumbnailKey) {
 					setSrc(getThumbnailUrlByThumbKey(thumbnailKey));
@@ -141,7 +125,19 @@ export default function FileThumb({ size = 1, ...props }: FileThumbProps) {
 				} else {
 					source = { uri: src };
 				}
+<<<<<<< Updated upstream
 				return <Image source={source} style={{ width: 70 * size, height: 70 * size }} />;
+=======
+				return (
+					<FastImage
+						source={source}
+						style={{
+							width: fixedSize ? size : 70 * size,
+							height: fixedSize ? size : 70 * size
+						}}
+					/>
+				);
+>>>>>>> Stashed changes
 			})()}
 		</FileThumbWrapper>
 	);

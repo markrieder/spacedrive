@@ -1,11 +1,11 @@
 import { DrawerContentScrollView } from '@react-navigation/drawer';
 import { DrawerContentComponentProps } from '@react-navigation/drawer/lib/typescript/src/types';
 import { AppLogo } from '@sd/assets/images';
-import { Image } from 'expo-image';
+import { JobManagerContextProvider, useLibraryQuery } from '@sd/client';
 import { CheckCircle } from 'phosphor-react-native';
 import { useRef } from 'react';
 import { Platform, Pressable, Text, View } from 'react-native';
-import { JobManagerContextProvider, useLibraryQuery } from '@sd/client';
+import FastImage from 'react-native-fast-image';
 import Layout from '~/constants/Layout';
 import { tw, twStyle } from '~/lib/tailwind';
 
@@ -42,7 +42,7 @@ const DrawerContent = ({ navigation, state }: DrawerContentComponentProps) => {
 			<View style={twStyle('justify-between', { height: drawerHeight })}>
 				<View>
 					<View style={tw`flex flex-row items-center`}>
-						<Image source={AppLogo} style={tw`h-[40px] w-[40px]`} />
+						<FastImage source={AppLogo} style={tw`h-[40px] w-[40px]`} />
 						<Text style={tw`ml-2 text-lg font-bold text-ink`}>Spacedrive</Text>
 					</View>
 					<View style={tw`mt-6`} />

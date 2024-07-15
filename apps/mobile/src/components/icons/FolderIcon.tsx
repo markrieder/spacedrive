@@ -1,5 +1,6 @@
 import { Folder, Folder_Light } from '@sd/assets/icons';
-import { Image } from 'expo-image';
+import FastImage from 'react-native-fast-image';
+
 
 type FolderProps = {
 	/**
@@ -14,7 +15,7 @@ type FolderProps = {
 };
 
 const FolderIcon: React.FC<FolderProps> = ({ size = 24, isWhite }) => {
-	return <Image source={isWhite ? Folder_Light : Folder} style={{ width: size, height: size }} />;
+	return <FastImage source={isWhite ? Folder_Light : Folder} style={{ width: size, height: size }} />;
 };
 
 export default FolderIcon;

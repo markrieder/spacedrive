@@ -45,7 +45,6 @@ export const getIcon = (
 	}
 
 	const lightKind = kind + '_Light';
-
 	// Select the icon based on the given parameters.
 	return icons[
 		// 1. Check if the specific extension icon exists.

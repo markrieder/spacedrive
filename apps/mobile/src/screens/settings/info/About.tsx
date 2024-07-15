@@ -1,8 +1,9 @@
-import { Image } from 'expo-image';
+import FastImage from 'react-native-fast-image';
+
+import { useBridgeQuery } from '@sd/client';
 import { Globe } from 'phosphor-react-native';
 import React from 'react';
 import { Linking, Platform, Text, View } from 'react-native';
-import { useBridgeQuery } from '@sd/client';
 import { DiscordIcon, GitHubIcon } from '~/components/icons/Brands';
 import ScreenContainer from '~/components/layout/ScreenContainer';
 import { Button } from '~/components/primitive/Button';
@@ -15,7 +16,7 @@ const AboutScreen = () => {
 	return (
 		<ScreenContainer style={tw`justify-start gap-0 px-6`}>
 			<View style={tw`flex flex-row items-center`}>
-				<Image
+				<FastImage
 					source={require('../../../../assets/icon.png')}
 					style={tw`mr-8 h-[88px] w-[88px] rounded-3xl`}
 					resizeMode="contain"
@@ -95,10 +96,10 @@ const AboutScreen = () => {
 					Meet the contributors behind Spacedrive
 				</Text>
 				{/* TODO: Temporary image url approach until a solution is reached */}
-				<Image
+				<FastImage
 					source={{ uri: 'https://i.imgur.com/SwUcWHP.png' }}
 					style={{ height: 200, width: '100%' }}
-					contentFit="contain"
+					resizeMode={FastImage.resizeMode.contain}
 				/>
 			</View>
 		</ScreenContainer>
