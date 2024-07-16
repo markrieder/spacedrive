@@ -468,8 +468,8 @@ pub(crate) fn mount() -> AlphaRouter<Ctx> {
 			})
 		})
 		.procedure("getInstance", {
-			R.with2(library())
-				.query(|(_, library), instance_id: instance::id::Type| async move {
+			R.with2(library()).query(
+				|(node, library), instance_id: instance::id::Type| async move {
 					let instance = library
 						.db
 						.instance()
@@ -483,8 +483,8 @@ pub(crate) fn mount() -> AlphaRouter<Ctx> {
 							)
 						})?;
 
-					debug!(%instance_id, "Found instance");
-					debug!(?instance, "Instance data");
+					// debug!(%instance_id, "Found instance");
+					// debug!(?instance, "Instance data");
 
 					let remote_identity_string =
 						RemoteIdentity::from_bytes(&instance.remote_identity).map_err(|e| {
@@ -495,10 +495,35 @@ pub(crate) fn mount() -> AlphaRouter<Ctx> {
 							)
 						})?;
 
-					debug!(?remote_identity_string, "Remote identity string");
+					// debug!(?remote_identity_string, "Remote identity string");
 
-					Ok(())
-				})
+					let library_list =
+						sd_cloud_api::library::get(node.cloud_api_config().await, library.id)
+							.await?;
+
+					// Get instance by matching remote identity string
+					let instance = match library_list {
+						Some(cloud_library) => cloud_library
+							.instances
+							.into_iter()
+							.find(|i| i.identity == remote_identity_string)
+							.ok_or_else(|| {
+								rspc::Error::new(
+									ErrorCode::NotFound,
+									"Instance not found in cloud library".to_string(),
+								)
+							})?,
+						None => {
+							return Err(rspc::Error::new(
+								ErrorCode::NotFound,
+								"Library not found in cloud".to_string(),
+							));
+						}
+					};
+
+					Ok(instance)
+				},
+			)
 		})
 		.merge("indexer_rules.", mount_indexer_rule_routes())
 }

@@ -28,7 +28,7 @@ export type Procedures = {
         { key: "library.list", input: never, result: LibraryConfigWrapped[] } | 
         { key: "library.statistics", input: LibraryArgs<null>, result: StatisticsResponse } | 
         { key: "locations.get", input: LibraryArgs<number>, result: Location | null } | 
-        { key: "locations.getInstance", input: LibraryArgs<number>, result: null } | 
+        { key: "locations.getInstance", input: LibraryArgs<number>, result: CloudInstance } | 
         { key: "locations.getWithRules", input: LibraryArgs<number>, result: LocationWithIndexerRule | null } | 
         { key: "locations.indexer_rules.get", input: LibraryArgs<number>, result: IndexerRule } | 
         { key: "locations.indexer_rules.list", input: LibraryArgs<null>, result: IndexerRule[] } | 
