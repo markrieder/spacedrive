@@ -31,6 +31,11 @@ import { LayoutContext } from './Context';
 import { DndContext } from './DndContext';
 import Sidebar from './Sidebar';
 
+const ANALYTICS_PING_INTERVAL_MS: number =
+	1_000 * // 1 second = 1,000 milliseconds
+	60 * // 1 minute = 60 seconds
+	15; // minutes
+
 const Layout = () => {
 	useRedirectToNewLocation();
 
@@ -153,7 +158,7 @@ function usePlausible() {
 	useEffect(() => {
 		const interval = setInterval(() => {
 			plausibleEvent({ event: { type: 'ping' } });
-		}, 600 * 1000); // 10 minutes
+		}, ANALYTICS_PING_INTERVAL_MS); // 10 minutes
 
 		return () => clearInterval(interval);
 	}, [plausibleEvent]);
