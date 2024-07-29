@@ -1,3 +1,4 @@
+import { Bell } from '@phosphor-icons/react';
 import { Link } from 'react-router-dom';
 import { useBridgeQuery, useLibraryQuery } from '@sd/client';
 import { useLocale, useOperatingSystem } from '~/hooks';
@@ -8,7 +9,7 @@ import { SearchContextProvider, useSearchFromSearchParams } from '../search';
 import SearchBar from '../search/SearchBar';
 import { AddLocationButton } from '../settings/library/locations/AddLocationButton';
 import { TopBarPortal } from '../TopBar/Portal';
-import TopBarOptions from '../TopBar/TopBarOptions';
+import TopBarOptions, { TOP_BAR_ICON_DEFAULT_PROPS } from '../TopBar/TopBarOptions';
 import FileKindStatistics from './FileKindStats';
 import OverviewSection from './Layout/Section';
 import LibraryStatistics from './LibraryStats';
@@ -50,34 +51,19 @@ export const Component = () => {
 					}
 					center={<SearchBar redirectToSearch />}
 					right={
-						os === 'windows' && <TopBarOptions />
-						// <TopBarOptions
-						// options={[
-						// 	[
-						// 		{
-						// 			toolTipLabel: 'Spacedrop',
-						// 			onClick: () => {},
-						// 			icon: <Broadcast className={TOP_BAR_ICON_STYLE} />,
-						// 			individual: true,
-						// 			showAtResolution: 'sm:flex'
-						// 		},
-						// 		{
-						// 			toolTipLabel: 'Key Manager',
-						// 			onClick: () => {},
-						// 			icon: <Key className={TOP_BAR_ICON_STYLE} />,
-						// 			individual: true,
-						// 			showAtResolution: 'sm:flex'
-						// 		},
-						// 		{
-						// 			toolTipLabel: 'Overview Display Settings',
-						// 			onClick: () => {},
-						// 			icon: <SlidersHorizontal className={TOP_BAR_ICON_STYLE} />,
-						// 			individual: true,
-						// 			showAtResolution: 'sm:flex'
-						// 		}
-						// 	]
-						// ]}
-						// 	/>
+						<TopBarOptions
+							options={[
+								[
+									{
+										toolTipLabel: t('Notifications'),
+										icon: <Bell {...TOP_BAR_ICON_DEFAULT_PROPS} />,
+										popOverComponent: <div></div>, // TODO: Add Notifications component
+										individual: true,
+										showAtResolution: 'xl:flex'
+									}
+								]
+							]}
+						/>
 					}
 				/>
 				<div className="mt-4 flex flex-col gap-3 pt-3">

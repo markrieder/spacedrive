@@ -1,4 +1,5 @@
 import {
+	Bell,
 	Icon,
 	Key,
 	MonitorPlay,
@@ -78,6 +79,13 @@ export const useExplorerTopBarOptions = () => {
 
 	const controlOptions: ToolOption[] = [
 		{
+			toolTipLabel: t('Notifications'),
+			icon: <Bell {...TOP_BAR_ICON_DEFAULT_PROPS} />,
+			popOverComponent: <div></div>, // TODO: Add Notifications component
+			individual: true,
+			showAtResolution: 'xl:flex'
+		},
+		{
 			toolTipLabel: t('explorer_settings'),
 			icon: <SlidersHorizontal {...TOP_BAR_ICON_DEFAULT_PROPS} />,
 			popOverComponent: <OptionsPanel />,
@@ -139,27 +147,12 @@ export const useExplorerTopBarOptions = () => {
 					weight={tagAssignMode ? 'fill' : TOP_BAR_ICON_WEIGHT}
 				/>
 			),
-			// TODO: Assign tag mode is not yet implemented!
 			onClick: () =>
 				(explorerStore.isTagAssignModeActive = !explorerStore.isTagAssignModeActive),
-			// TODO: remove once tag-assign-mode impl complete
-			// onClick: () => toast.info('Coming soon!'),
 			topBarActive: tagAssignMode,
 			individual: true,
 			showAtResolution: 'xl:flex'
 		}
-		// {
-		// 	toolTipLabel: 'Tag Assign Mode',
-		// 	icon: (
-		// 		<Tag weight={tagAssignMode ? 'fill' : 'regular'} className={TOP_BAR_ICON_STYLE} />
-		// 	),
-		// 	// TODO: Assign tag mode is not yet implemented!
-		// 	// onClick: () => (explorerStore.tagAssignMode = !explorerStore.tagAssignMode),
-		// 	onClick: () => toast.info(t('coming_soon)),
-		// 	topBarActive: tagAssignMode,
-		// 	individual: true,
-		// 	showAtResolution: 'xl:flex'
-		// }
 	] satisfies ToolOption[];
 
 	return {
