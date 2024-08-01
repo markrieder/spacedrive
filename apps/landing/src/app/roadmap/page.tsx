@@ -21,7 +21,7 @@ export default function Page() {
 					so far.
 				</p>
 				<p>
-					Last updated: <span className="font-bold text-white">March 13, 2024</span>
+					Last updated: <span className="font-bold text-white">July 30, 2024</span>
 				</p>
 			</section>
 			<section className="grid auto-cols-auto grid-flow-row grid-cols-[auto_1fr] gap-x-4">
@@ -51,7 +51,7 @@ export default function Page() {
 								<div
 									className={
 										'flex h-full w-full ' +
-										(item.completed ? 'z-10 bg-primary-500' : 'bg-gray-550')
+										(item.completed ? 'z-10 bg-primary-500' : 'bg-gray-550') // Change to tricolour: Done, In Progress, To Do
 									}
 								>
 									{item?.when !== undefined ? (

@@ -40,14 +40,18 @@ export default async function Page() {
 				<div className="mt-22 lg:mt-28" id="content" aria-hidden="true" />
 				<div className="mt-24 lg:mt-8" />
 				<NewBanner
-					headline="Alpha 0.4 is out!"
+					headline="Alpha 0.4.1 is out!"
 					className="mt-[50px] lg:mt-0"
-					href="/docs/changelog/alpha/0.4.0"
+					href="/docs/changelog/alpha/0.4.1"
 				/>
 				<h1 className="fade-in-heading z-30 mb-3 bg-clip-text px-2 text-center text-4xl font-bold leading-tight text-white md:text-5xl lg:text-7xl">
 					One Explorer. All Your Files.
 				</h1>
 				<p className="animation-delay-1 fade-in-heading text-md leading-2 z-30 mb-8 mt-1 max-w-4xl text-center text-gray-450 lg:text-lg lg:leading-8">
+					Access all your local, remote, and cloud data, from one single easy-to-use file explorer.
+
+					(Index and access reference?)
+
 					Unify files from all your devices and clouds into a single, easy-to-use
 					explorer.
 					<br />
