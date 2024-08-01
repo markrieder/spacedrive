@@ -2,95 +2,98 @@ export const items = [
 	{
 		when: 'Big Bang',
 		subtext: 'Q1 2022',
-		completed: true,
+		completed: 'done',
 		title: 'File discovery',
 		description:
 			'Scan devices, drives and cloud accounts to build a directory of all files with metadata.'
 	},
 	{
+		completed: 'done',
 		title: 'Preview generation',
-		completed: true,
 		description: 'Auto generate lower resolution stand-ins for image and video.'
 	},
 	{
 		title: 'Statistics',
-		completed: true,
+		completed: 'done',
 		description: 'Total capacity, index size, preview media size, free space etc.'
 	},
 	{
+		completed: 'done',
 		title: 'Jobs',
-		completed: true,
 		description:
 			'Tasks to be performed via a queue system with multi-threaded workers, such as indexing, identifying, generating preview media and moving files. With a Job Manager interface for tracking progress, pausing and restarting jobs.'
 	},
 	{
-		completed: true,
+		completed: 'done',
 		title: 'Explorer',
 		description:
 			'Browse online/offline storage locations, view files with metadata, perform basic CRUD.'
 	},
 	{
-		completed: true,
+		completed: 'done',
 		title: 'Self hosting',
 		description:
 			'Spacedrive can be deployed as a service via Docker, behaving as just another device powering your personal cloud.'
 	},
 	{
-		completed: true,
+		completed: 'done',
 		title: 'Tags',
 		description:
 			'Define routines on custom tags to automate workflows, easily tag files individually, in bulk and automatically via rules.'
 	},
 	{
-		completed: true,
+		completed: 'done',
 		title: 'Search',
 		description:
 			'Instantly search your library, including offline locations. Use advanced filters to refine and save searches for later.'
 	},
 	{
-		completed: true,
+		completed: 'done',
 		title: 'Quick view',
 		description:
 			'View images, videos and documents in a full screen modal with nested inspector and context switcher.'
 	},
 	{
-		completed: true,
+		completed: 'done',
 		title: 'Media view',
 		description: 'Turn any directory into a camera roll including media from subdirectories'
 	},
 	{
-		completed: true,
+		completed: 'done',
 		title: 'Spacedrop',
 		description: 'Drop files between devices and contacts on a keybind like AirDrop.'
 	},
 	{
-		completed: true,
+		completed: 'done',
 		title: 'AI labeling for images',
 		description:
 			'Automatically label images with objects, with a model loader to support future models and upgrading to more powerful models for various jobs.'
 	},
 	{
+		completed: 'done',
 		title: 'Drag & drop',
-		completed: true,
 		description: 'Drag and drop files between devices and drives.'
 	},
 	{
+		completed: 'done',
 		title: 'Language support',
-		completed: true,
 		description: 'Support for 12+ languages, with a community-driven translation via i18n.'
 	},
 	{
+		completed: 'in progress',
 		when: '0.2 Alpha',
 		subtext: 'February 2024',
 		title: 'Column view',
 		description: 'View files in the beloved column layout with a nested inspector, with trees!'
 	},
 	{
+		completed: 'in progress',
 		title: 'Improved file transfers',
 		description:
 			'Instant copy for files on the same device. An improved progress bar and speed indicator. Pause, resume and prioritize transfers.'
 	},
 	{
+		completed: 'in progress',
 		title: 'Folder sync',
 		description:
 			'Configure replication or bidirectional sync between folders on any device or drive.'

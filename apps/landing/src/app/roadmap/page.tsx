@@ -49,10 +49,13 @@ export default function Page() {
 							</div>
 							<div className="flex h-full w-2 group-first:mt-2 group-first:rounded-t-full group-last-of-type:rounded-b-full lg:items-center">
 								<div
-									className={
-										'flex h-full w-full ' +
-										(item.completed ? 'z-10 bg-primary-500' : 'bg-gray-550') // Change to tricolour: Done, In Progress, To Do
-									}
+									className={clsx(
+										'flex h-full w-full',
+										item.completed === 'done' ? 'bg-primary-500' :
+										item.completed === 'in progress' ? 'bg-yellow-500' :
+										'bg-gray-550'
+									  )}
+										//(item.completed ? 'z-10 bg-primary-500' : 'bg-gray-550') // Change to tricolour: Done, In Progress, To Do
 								>
 									{item?.when !== undefined ? (
 										<div
