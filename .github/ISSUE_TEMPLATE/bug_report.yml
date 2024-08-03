@@ -45,9 +45,9 @@ body:
         ```
       value: |
         - OS:
-        - Spacedrive:
+        - Spacedrive:x
 
-        <details><summary> 
+        <details open><summary> 
         
         Development tool versions (optional) 
         
