@@ -1,5 +1,13 @@
+// this is temporarily hardcoded, just for the 0.4.3 release.
+// PLEASE IF THIS EVER MAKES IT INTO MAIN FIX IT.
+// keywords if someone needs to do a codebase search to find out why something breaks:
+// (each one on a new line so they're apparent in VS Code search results)
+// libav !!! FIX THIS
+// libavcodec !!! FIX THIS
+// libavformat !!! FIX THIS
+// native-deps !!! FIX THIS
 export const NATIVE_DEPS_URL =
-	'https://github.com/spacedriveapp/native-deps/releases/latest/download'
+	'https://github.com/spacedriveapp/native-deps/releases/v0.18/download'
 
 export const NATIVE_DEPS_ASSETS = {
 	Linux: {
