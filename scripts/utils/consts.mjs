@@ -6,8 +6,9 @@
 // libavcodec !!! FIX THIS
 // libavformat !!! FIX THIS
 // native-deps !!! FIX THIS
+// ~ilynxcat 26/nov/2024
 export const NATIVE_DEPS_URL =
-	'https://github.com/spacedriveapp/native-deps/releases/v0.18/download'
+	'https://github.com/spacedriveapp/native-deps/releases/download/v0.18'
 
 export const NATIVE_DEPS_ASSETS = {
 	Linux: {
