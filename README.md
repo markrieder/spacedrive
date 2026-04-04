@@ -120,7 +120,8 @@ The implementation is a single Rust crate with CQRS/DDD architecture. Every oper
 | Media           | FFmpeg, libheif, Pdfium, Whisper             |
 | Desktop         | Tauri 2                                      |
 | Mobile          | React Native + Expo                          |
-| Frontend        | React 19, Vite, TanStack Query, Tailwind CSS |
+| Frontend        | React 19, Vite, TanStack Query, Tailwind CSS v4 |
+| Design system   | [SpaceUI](https://github.com/spacedriveapp/spaceui) (shared component library) |
 | Type generation | Specta                                       |
 
 ```
@@ -178,6 +179,7 @@ Optional cloud integration is available for backup and remote access, but it's n
 - **Join [Discord](https://discord.gg/gTaF2Z44f5)** to chat with developers and community
 - **[Contributing Guide](CONTRIBUTING.md)**
 - **[Adapter Guide](docs/ADAPTERS.md)** — write a data source adapter
+- **[SpaceUI](https://github.com/spacedriveapp/spaceui)** — shared design system (clone alongside Spacedrive to work on UI)
 
 ---
 

@@ -1,5 +1,6 @@
-//! Source sync action handler
+//! Source sync action — dispatches a SourceSyncJob
 
+use super::job::SourceSyncJob;
 use crate::{
 	context::CoreContext,
 	infra::action::{error::ActionError, LibraryAction},
@@ -14,14 +15,6 @@ pub struct SyncSourceInput {
 	pub source_id: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Type)]
-pub struct SyncSourceOutput {
-	pub records_upserted: u64,
-	pub records_deleted: u64,
-	pub duration_ms: u64,
-	pub error: Option<String>,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SyncSourceAction {
 	input: SyncSourceInput,
@@ -29,7 +22,7 @@ pub struct SyncSourceAction {
 
 impl LibraryAction for SyncSourceAction {
 	type Input = SyncSourceInput;
-	type Output = SyncSourceOutput;
+	type Output = crate::infra::job::handle::JobReceipt;
 
 	fn from_input(input: SyncSourceInput) -> Result<Self, String> {
 		if input.source_id.trim().is_empty() {
@@ -43,6 +36,7 @@ impl LibraryAction for SyncSourceAction {
 		library: Arc<Library>,
 		_context: Arc<CoreContext>,
 	) -> Result<Self::Output, ActionError> {
+		// Get source name for job display
 		if library.source_manager().is_none() {
 			library.init_source_manager().await.map_err(|e| {
 				ActionError::Internal(format!("Failed to init source manager: {e}"))
@@ -53,17 +47,27 @@ impl LibraryAction for SyncSourceAction {
 			.source_manager()
 			.ok_or_else(|| ActionError::Internal("Source manager not available".to_string()))?;
 
-		let report = source_manager
-			.sync_source(&self.input.source_id)
+		// Look up source name
+		let sources = source_manager
+			.list_sources()
 			.await
 			.map_err(|e| ActionError::Internal(e))?;
 
-		Ok(SyncSourceOutput {
-			records_upserted: report.records_upserted,
-			records_deleted: report.records_deleted,
-			duration_ms: report.duration_ms,
-			error: report.error,
-		})
+		let source_name = sources
+			.iter()
+			.find(|s| s.id == self.input.source_id)
+			.map(|s| s.name.clone())
+			.unwrap_or_else(|| self.input.source_id.clone());
+
+		let job = SourceSyncJob::new(self.input.source_id, source_name);
+
+		let job_handle = library
+			.jobs()
+			.dispatch(job)
+			.await
+			.map_err(ActionError::Job)?;
+
+		Ok(job_handle.into())
 	}
 
 	fn action_kind(&self) -> &'static str {

@@ -279,8 +279,7 @@ export function SourceDetail() {
 			{/* Banners */}
 			{(updateMutation.data ||
 				updateMutation.error ||
-				syncMutation.error ||
-				(syncMutation.data && !syncMutation.data.error)) && (
+				syncMutation.error) && (
 				<div className="border-app-line/30 space-y-2 border-b px-6 py-3">
 					{updateMutation.data && (
 						<div className="border-accent/20 rounded-lg border p-3">
@@ -305,18 +304,6 @@ export function SourceDetail() {
 						<div className="rounded-lg border border-red-400/20 p-3">
 							<p className="text-xs text-red-400">
 								Sync failed: {String(syncMutation.error)}
-							</p>
-						</div>
-					)}
-					{syncMutation.data && !syncMutation.data.error && (
-						<div className="border-accent/20 rounded-lg border p-3">
-							<p className="text-accent text-xs">
-								Synced{" "}
-								{syncMutation.data.records_upserted} records in{" "}
-								{(
-									syncMutation.data.duration_ms / 1000
-								).toFixed(1)}
-								s
 							</p>
 						</div>
 					)}

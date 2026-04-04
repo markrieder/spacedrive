@@ -209,7 +209,6 @@ function ConfigureForm({
 	const [name, setName] = useState("");
 	const [values, setValues] = useState<Record<string, string>>({});
 	const [error, setError] = useState<string | null>(null);
-	const [syncing, setSyncing] = useState(false);
 	const [result, setResult] = useState<string | null>(null);
 
 	const handleFieldChange = useCallback((key: string, value: string) => {
@@ -247,22 +246,16 @@ function ConfigureForm({
 				config,
 			});
 
-			setSyncing(true);
-			const report = await syncSource.mutateAsync({
+			// Dispatch sync as a background job
+			await syncSource.mutateAsync({
 				source_id: source.id,
 			});
 
-			if (report.error) {
-				setResult(`Synced with warning: ${report.error}`);
-			} else {
-				setResult(
-					`Synced ${report.records_upserted} records in ${(report.duration_ms / 1000).toFixed(1)}s`,
-				);
-			}
-			setSyncing(false);
+			setResult(
+				"Source created. Sync is running in the background — check the job manager for progress.",
+			);
 		} catch (e) {
 			setError(String(e));
-			setSyncing(false);
 		}
 	};
 
@@ -301,15 +294,6 @@ function ConfigureForm({
 				>
 					Done
 				</button>
-			</div>
-		);
-	}
-
-	if (syncing) {
-		return (
-			<div className="flex flex-col items-center py-6">
-				<div className="border-accent mb-3 h-5 w-5 animate-spin rounded-full border-2 border-t-transparent" />
-				<p className="text-ink-dull text-sm">Syncing...</p>
 			</div>
 		);
 	}

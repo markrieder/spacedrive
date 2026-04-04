@@ -349,26 +349,31 @@ export function SpacebotProvider({children}: SpacebotProviderProps) {
 				}
 				setIsTyping(false);
 				setStreamingAssistantText('');
-				void Promise.all([
-					queryClient.invalidateQueries({
-						queryKey: ['spacebot', 'conversations', selectedAgent]
-					}),
-					queryClient.invalidateQueries({
-						queryKey: [
-							'spacebot',
-							'portal-history',
-							selectedAgent,
-							conversationId
-						]
-					}),
-					queryClient.invalidateQueries({
-						queryKey: [
-							'spacebot',
-							'channel-timeline',
-							conversationId
-						]
-					})
-				]);
+				// Push the assistant message directly into the timeline cache.
+				queryClient.setQueryData(
+					['spacebot', 'channel-timeline', conversationId],
+					(old: { items: unknown[]; has_more: boolean } | undefined) => {
+						if (!old) return old;
+						return {
+							...old,
+							items: [
+								...old.items,
+								{
+									type: 'message' as const,
+									id: `sse-${Date.now()}`,
+									role: 'assistant',
+									content: event.text,
+									sender_id: event.agent_id ?? null,
+									sender_name: event.agent_id ?? null,
+									created_at: new Date().toISOString()
+								}
+							]
+						};
+					}
+				);
+				void queryClient.invalidateQueries({
+					queryKey: ['spacebot', 'conversations', selectedAgent]
+				});
 			},
 			inbound_message: (payload) => {
 				const event = payload as InboundMessageEvent;
@@ -378,26 +383,32 @@ export function SpacebotProvider({children}: SpacebotProviderProps) {
 				) {
 					return;
 				}
-				void Promise.all([
-					queryClient.invalidateQueries({
-						queryKey: ['spacebot', 'conversations', selectedAgent]
-					}),
-					queryClient.invalidateQueries({
-						queryKey: [
-							'spacebot',
-							'portal-history',
-							selectedAgent,
-							conversationId
-						]
-					}),
-					queryClient.invalidateQueries({
-						queryKey: [
-							'spacebot',
-							'channel-timeline',
-							conversationId
-						]
-					})
-				]);
+				// Push the user message directly into the timeline cache
+				// so it appears instantly (like the portal SSE-driven approach).
+				queryClient.setQueryData(
+					['spacebot', 'channel-timeline', conversationId],
+					(old: { items: unknown[]; has_more: boolean } | undefined) => {
+						if (!old) return old;
+						return {
+							...old,
+							items: [
+								...old.items,
+								{
+									type: 'message' as const,
+									id: `sse-${Date.now()}`,
+									role: 'user',
+									content: event.text,
+									sender_id: event.sender_id ?? null,
+									sender_name: event.sender_name ?? null,
+									created_at: new Date().toISOString()
+								}
+							]
+						};
+					}
+				);
+				void queryClient.invalidateQueries({
+					queryKey: ['spacebot', 'conversations', selectedAgent]
+				});
 			}
 		}
 	});

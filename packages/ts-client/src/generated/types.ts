@@ -4036,8 +4036,6 @@ export type SyncPartnersDebugInfo = { total_devices: number; sync_enabled_device
 
 export type SyncSourceInput = { source_id: string };
 
-export type SyncSourceOutput = { records_upserted: number; records_deleted: number; duration_ms: number; error: string | null };
-
 /**
  * State metrics snapshot
  */
@@ -4938,7 +4936,7 @@ export type LibraryAction =
   |  { type: 'media.thumbstrip.generate'; input: GenerateThumbstripInput; output: GenerateThumbstripOutput }
   |  { type: 'sources.create'; input: CreateSourceInput; output: CreateSourceOutput }
   |  { type: 'sources.delete'; input: DeleteSourceInput; output: DeleteSourceOutput }
-  |  { type: 'sources.sync'; input: SyncSourceInput; output: SyncSourceOutput }
+  |  { type: 'sources.sync'; input: SyncSourceInput; output: JobReceipt }
   |  { type: 'spaces.add_group'; input: AddGroupInput; output: AddGroupOutput }
   |  { type: 'spaces.add_item'; input: AddItemInput; output: AddItemOutput }
   |  { type: 'spaces.create'; input: SpaceCreateInput; output: SpaceCreateOutput }
