@@ -54,28 +54,28 @@ export default defineConfig(async () => ({
 				)
 			},
 			{
-				find: '@spaceui/tokens/src/css',
+				find: '@spacedrive/tokens/src/css',
 				replacement: path.resolve(
 					__dirname,
 					'../../../spaceui/packages/tokens/src/css'
 				)
 			},
 			{
-				find: '@spaceui/tokens',
+				find: '@spacedrive/tokens',
 				replacement: path.resolve(
 					__dirname,
 					'../../../spaceui/packages/tokens'
 				)
 			},
 			{
-				find: '@spaceui/ai',
+				find: '@spacedrive/ai',
 				replacement: path.resolve(
 					__dirname,
 					'../../../spaceui/packages/ai/src/index.ts'
 				)
 			},
 			{
-				find: '@spaceui/primitives',
+				find: '@spacedrive/primitives',
 				replacement: path.resolve(
 					__dirname,
 					'../../../spaceui/packages/primitives/src/index.ts'
@@ -106,7 +106,7 @@ export default defineConfig(async () => ({
 	},
 
 	optimizeDeps: {
-		exclude: ['@spaceui/ai', '@spaceui/primitives', '@spaceui/tokens']
+		exclude: ['@spacedrive/ai', '@spacedrive/primitives', '@spacedrive/tokens']
 	},
 
 	clearScreen: false,

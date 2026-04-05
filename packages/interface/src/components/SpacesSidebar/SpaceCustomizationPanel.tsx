@@ -7,7 +7,7 @@ import { SpaceItem } from "./SpaceItem";
 import { createPortal } from "react-dom";
 import { useState } from "react";
 import { useLibraryMutation } from "../../contexts/SpacedriveContext";
-import { Input } from "@spaceui/primitives";
+import { Input } from "@spacedrive/primitives";
 
 interface PaletteItem {
 	type: ItemType;

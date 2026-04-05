@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion';
 import { X, ShareNetwork, Users } from '@phosphor-icons/react';
 import { useState, useMemo } from 'react';
-import { CircleButton } from '@spaceui/primitives';
+import { CircleButton } from '@spacedrive/primitives';
 
 interface Person {
 	id: string;

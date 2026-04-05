@@ -19,7 +19,7 @@ import type {
 	SpaceGroup as SpaceGroupType,
 	SpaceItem as SpaceItemType
 } from '@sd/ts-client';
-import {CircleButton, Popover, usePopover} from '@spaceui/primitives';
+import {CircleButton, Popover, usePopover} from '@spacedrive/primitives';
 import clsx from 'clsx';
 import {motion} from 'framer-motion';
 import {memo, useEffect, useState} from 'react';

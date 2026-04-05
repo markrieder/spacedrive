@@ -28,21 +28,21 @@ export default defineConfig({
 				replacement: path.resolve(__dirname, "./node_modules/react-dom/client.js"),
 			},
 			{
-				find: "@spaceui/tokens/css/themes",
+				find: "@spacedrive/tokens/css/themes",
 				replacement: path.resolve(
 					__dirname,
 					"../../../spaceui/packages/tokens/src/css/themes",
 				),
 			},
 			{
-				find: "@spaceui/tokens/css",
+				find: "@spacedrive/tokens/css",
 				replacement: path.resolve(
 					__dirname,
 					"../../../spaceui/packages/tokens/src/css/base.css",
 				),
 			},
 			{
-				find: "@spaceui/tokens",
+				find: "@spacedrive/tokens",
 				replacement: path.resolve(
 					__dirname,
 					"../../../spaceui/packages/tokens/src/index.ts",
@@ -67,7 +67,7 @@ export default defineConfig({
 		},
 	},
 	optimizeDeps: {
-		exclude: ["@spaceui/ai", "@spaceui/primitives", "@spaceui/tokens"],
+		exclude: ["@spacedrive/ai", "@spacedrive/primitives", "@spacedrive/tokens"],
 	},
 	build: {
 		outDir: "dist",

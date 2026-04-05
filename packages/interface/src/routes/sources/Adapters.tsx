@@ -10,7 +10,7 @@ import {
 	useLibraryMutation,
 } from "../../contexts/SpacedriveContext";
 import { TopBarPortal, TopBarItem } from "../../TopBar";
-import { CircleButton } from "@spaceui/primitives";
+import { CircleButton } from "@spacedrive/primitives";
 import { ExpandableSearchButton } from "../explorer/components/ExpandableSearchButton";
 import { SourceTypeIcon } from "../../components/Sources/SourceTypeIcon";
 

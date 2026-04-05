@@ -2,7 +2,7 @@
 
 /**
  * Spacedrive-specific Popover wrapper that preserves the usePopover + trigger prop API.
- * Built on top of @spaceui/primitives Radix Popover.
+ * Built on top of @spacedrive/primitives Radix Popover.
  *
  * Usage:
  *   const popover = usePopover();
@@ -11,7 +11,7 @@
  *   </WrappedPopover>
  */
 
-import { Popover } from "@spaceui/primitives";
+import { Popover } from "@spacedrive/primitives";
 import clsx from "clsx";
 import React, { useEffect, useRef } from "react";
 

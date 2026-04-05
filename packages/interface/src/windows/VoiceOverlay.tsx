@@ -5,7 +5,7 @@ import {
 	Stop,
 } from "@phosphor-icons/react";
 import { BallBlue } from "@sd/assets/images";
-import { Popover, usePopover } from "@spaceui/primitives";
+import { Popover, usePopover } from "@spacedrive/primitives";
 import {
 	apiClient,
 	getEventsUrl,

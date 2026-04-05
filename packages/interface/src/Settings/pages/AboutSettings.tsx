@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 import { BallBlue } from "@sd/assets/images";
 import Orb from "../../components/Orb";
-import { CircleButton } from "@spaceui/primitives";
+import { CircleButton } from "@spacedrive/primitives";
 import { GlobeHemisphereWest, GithubLogo, DiscordLogo } from "@phosphor-icons/react";
 import contributors from "../../contributors.json";
 

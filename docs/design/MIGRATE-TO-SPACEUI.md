@@ -1,6 +1,6 @@
-# Migrate @sd/ui → @spaceui/primitives
+# Migrate @sd/ui → @spacedrive/primitives
 
-Replace all imports from `@sd/ui` with `@spaceui/primitives` across the spacedrive codebase. The components are identical — same names, same props, same behavior. This is a pure import path swap.
+Replace all imports from `@sd/ui` with `@spacedrive/primitives` across the spacedrive codebase. The components are identical — same names, same props, same behavior. This is a pure import path swap.
 
 ## Rules
 
@@ -11,11 +11,11 @@ Replace all imports from `@sd/ui` with `@spaceui/primitives` across the spacedri
 
 ## Import Mapping
 
-Every import from `'@sd/ui'` becomes an import from `'@spaceui/primitives'` with these exceptions:
+Every import from `'@sd/ui'` becomes an import from `'@spacedrive/primitives'` with these exceptions:
 
-### Form field wrappers → `@spaceui/forms`
+### Form field wrappers → `@spacedrive/forms`
 
-These imports come from `@spaceui/forms`, NOT `@spaceui/primitives`:
+These imports come from `@spacedrive/forms`, NOT `@spacedrive/primitives`:
 
 - `FormField`
 - `CheckBoxField`
@@ -30,9 +30,9 @@ These imports come from `@spaceui/forms`, NOT `@spaceui/primitives`:
 - `cva` → `import { cva } from 'class-variance-authority'`
 - `cx` → `import { cx } from 'class-variance-authority'`
 
-### Everything else → `@spaceui/primitives`
+### Everything else → `@spacedrive/primitives`
 
-All of these come from `@spaceui/primitives`:
+All of these come from `@spacedrive/primitives`:
 
 ```
 Button, buttonStyles, buttonVariants, ButtonProps, LinkButtonProps
@@ -83,10 +83,10 @@ export * as Dropdown from './Dropdown';
 export * as RadioGroup from './RadioGroup';
 export * as Tabs from './Tabs';
 
-// After — same namespace pattern from @spaceui/primitives:
-import { Dropdown } from '@spaceui/primitives';   // if using the namespace re-export
+// After — same namespace pattern from @spacedrive/primitives:
+import { Dropdown } from '@spacedrive/primitives';   // if using the namespace re-export
 // OR
-import * as Dropdown from '@spaceui/primitives/src/Dropdown';  // direct
+import * as Dropdown from '@spacedrive/primitives/src/Dropdown';  // direct
 ```
 
 Check each file's actual usage to determine the correct import style.
@@ -115,8 +115,8 @@ Some files import both primitives AND form fields from `@sd/ui`. Split into two 
 import { Button, Input, Dialog, useDialog, dialogManager, InputField, FormField } from '@sd/ui';
 
 // After
-import { Button, Input, Dialog, useDialog, dialogManager } from '@spaceui/primitives';
-import { InputField, FormField } from '@spaceui/forms';
+import { Button, Input, Dialog, useDialog, dialogManager } from '@spacedrive/primitives';
+import { InputField, FormField } from '@spacedrive/forms';
 ```
 
 ## How to Handle cva/cx
@@ -127,7 +127,7 @@ import { cva, cx, Button } from '@sd/ui';
 
 // After
 import { cva, cx } from 'class-variance-authority';
-import { Button } from '@spaceui/primitives';
+import { Button } from '@spacedrive/primitives';
 ```
 
 ## Verification

@@ -4,8 +4,8 @@ import { useLibraryQuery } from "../../contexts/SpacedriveContext";
 import { useTabManager } from "../../components/TabManager/useTabManager";
 import { SourceCard } from "../../components/Sources/SourceCard";
 import { TopBarPortal, TopBarItem } from "../../TopBar";
-import { CircleButton } from "@spaceui/primitives";
-import { SearchBar } from "@spaceui/primitives";
+import { CircleButton } from "@spacedrive/primitives";
+import { SearchBar } from "@spacedrive/primitives";
 
 export function SourcesHome() {
 	const navigate = useNavigate();

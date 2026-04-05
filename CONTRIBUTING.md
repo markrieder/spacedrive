@@ -584,11 +584,11 @@ Spacedrive's UI components come from [SpaceUI](https://github.com/spacedriveapp/
 
 | Package | Description |
 |---------|-------------|
-| `@spaceui/tokens` | Design tokens, semantic color system, Tailwind v4 theme |
-| `@spaceui/primitives` | Base UI components built on Radix UI |
-| `@spaceui/forms` | Form field wrappers for react-hook-form |
-| `@spaceui/ai` | AI agent interaction components |
-| `@spaceui/explorer` | File management components |
+| `@spacedrive/tokens` | Design tokens, semantic color system, Tailwind v4 theme |
+| `@spacedrive/primitives` | Base UI components built on Radix UI |
+| `@spacedrive/forms` | Form field wrappers for react-hook-form |
+| `@spacedrive/ai` | AI agent interaction components |
+| `@spacedrive/explorer` | File management components |
 
 ### Working on UI Alongside Spacedrive
 
@@ -615,14 +615,14 @@ bun run link
 
 # Link into Spacedrive
 cd ../spacedrive
-bun link @spaceui/tokens @spaceui/primitives @spaceui/ai
+bun link @spacedrive/tokens @spacedrive/primitives @spacedrive/ai
 ```
 
 With linking active, changes you make in `spaceui/` are picked up immediately by Spacedrive's Vite dev server — no rebuild needed. The Vite configs in `apps/tauri/` and `apps/web/` already have the necessary source aliases, `optimizeDeps.exclude`, and `server.fs.allow` settings configured.
 
 ### If You're Only Working on Spacedrive
 
-If you're not modifying SpaceUI itself, you don't need to clone it. Spacedrive consumes published `@spaceui/*` packages from npm. Just run `bun install` and everything resolves from the registry.
+If you're not modifying SpaceUI itself, you don't need to clone it. Spacedrive consumes published `@spacedrive/*` packages from npm. Just run `bun install` and everything resolves from the registry.
 
 ### SpaceUI Integration Guide
 

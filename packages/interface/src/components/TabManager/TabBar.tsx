@@ -5,7 +5,7 @@ import {
 } from '@dnd-kit/sortable';
 import {CSS} from '@dnd-kit/utilities';
 import {Plus, X} from '@phosphor-icons/react';
-import {TabBar as TabBarPrimitive, TabBarItem} from '@spaceui/primitives';
+import {TabBar as TabBarPrimitive, TabBarItem} from '@spacedrive/primitives';
 import clsx from 'clsx';
 import {useMemo} from 'react';
 import type {Tab} from '.';

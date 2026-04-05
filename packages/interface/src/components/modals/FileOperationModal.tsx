@@ -19,7 +19,7 @@ import {
 	Dialog,
 	dialogManager,
 	useDialog,
-} from "@spaceui/primitives";
+} from "@spacedrive/primitives";
 import type { SdPath, File as FileType } from "@sd/ts-client";
 import { useLibraryMutation, useLibraryQuery } from "../../contexts/SpacedriveContext";
 import { File, FileStack } from "../../routes/explorer/File";

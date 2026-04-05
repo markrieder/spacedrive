@@ -13,7 +13,7 @@ import {
 	useLibraryMutation,
 	useNormalizedQuery
 } from '@sd/ts-client';
-import {Button, CircleButton, Popover, usePopover} from '@spaceui/primitives';
+import {Button, CircleButton, Popover, usePopover} from '@spacedrive/primitives';
 import clsx from 'clsx';
 import {motion} from 'framer-motion';
 import {useEffect, useState} from 'react';

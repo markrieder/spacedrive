@@ -9,13 +9,13 @@
 </Popover>
 ```
 
-`Popover` is now a Radix composable object from `@spaceui/primitives`, not a function component. Every usage must be converted.
+`Popover` is now a Radix composable object from `@spacedrive/primitives`, not a function component. Every usage must be converted.
 
 ## The Pattern
 
 **Before:**
 ```tsx
-import { Popover, usePopover } from "@spaceui/primitives";
+import { Popover, usePopover } from "@spacedrive/primitives";
 
 const popover = usePopover();
 
@@ -33,7 +33,7 @@ const popover = usePopover();
 
 **After:**
 ```tsx
-import { Popover, usePopover } from "@spaceui/primitives";
+import { Popover, usePopover } from "@spacedrive/primitives";
 
 const popover = usePopover();
 

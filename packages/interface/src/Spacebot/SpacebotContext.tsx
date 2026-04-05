@@ -18,7 +18,7 @@ import {
 	type PortalConversationSummary,
 	type TypingStateEvent
 } from '@spacebot/api-client';
-import {SearchBar, usePopover} from '@spaceui/primitives';
+import {SearchBar, usePopover} from '@spacedrive/primitives';
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query';
 import {
 	createContext,

@@ -7,7 +7,7 @@ import type {
 	PortalConversationSummary,
 	PortalHistoryMessage
 } from '@spacebot/api-client';
-import {MessageBubble} from '@spaceui/ai';
+import {MessageBubble} from '@spacedrive/ai';
 import {useQuery} from '@tanstack/react-query';
 import {useVirtualizer} from '@tanstack/react-virtual';
 import {useEffect, useMemo, useRef} from 'react';
@@ -28,11 +28,11 @@ interface ConversationScreenProps {
 	selectedProject: string;
 	selectedModel: string;
 	projectOptions: string[];
-	models: import('@spaceui/ai').ModelOption[];
+	models: import('@spacedrive/ai').ModelOption[];
 	onSelectProject(project: string): void;
 	onSelectModel(model: string): void;
 	projectSelector: ReturnType<
-		typeof import('@spaceui/primitives').usePopover
+		typeof import('@spacedrive/primitives').usePopover
 	>;
 	isSending?: boolean;
 }

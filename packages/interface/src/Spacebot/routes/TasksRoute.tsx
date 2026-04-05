@@ -9,7 +9,7 @@ import {
 	TaskList,
 	type TaskPriority as UiTaskPriority,
 	type TaskStatus as UiTaskStatus,
-} from '@spaceui/ai';
+} from '@spacedrive/ai';
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query';
 import {useCallback, useState} from 'react';
 import {agents, useSpacebot} from '../SpacebotContext';

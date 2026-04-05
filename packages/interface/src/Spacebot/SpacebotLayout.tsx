@@ -14,7 +14,7 @@ import {
 	SearchBar,
 	SelectPill,
 	usePopover
-} from '@spaceui/primitives';
+} from '@spacedrive/primitives';
 import {ReactQueryDevtools} from '@tanstack/react-query-devtools';
 import {useEffect, useState} from 'react';
 import {Outlet, useLocation, useNavigate} from 'react-router-dom';

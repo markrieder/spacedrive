@@ -1,12 +1,12 @@
 @import "tailwindcss";
-@import "@spaceui/tokens/src/css/theme.css";
-@import "@spaceui/tokens/src/css/base.css";
-@import "@spaceui/tokens/src/css/themes/light.css";
-@import "@spaceui/tokens/src/css/themes/midnight.css";
-@import "@spaceui/tokens/src/css/themes/noir.css";
-@import "@spaceui/tokens/src/css/themes/slate.css";
-@import "@spaceui/tokens/src/css/themes/nord.css";
-@import "@spaceui/tokens/src/css/themes/mocha.css";
+@import "@spacedrive/tokens/src/css/theme.css";
+@import "@spacedrive/tokens/src/css/base.css";
+@import "@spacedrive/tokens/src/css/themes/light.css";
+@import "@spacedrive/tokens/src/css/themes/midnight.css";
+@import "@spacedrive/tokens/src/css/themes/noir.css";
+@import "@spacedrive/tokens/src/css/themes/slate.css";
+@import "@spacedrive/tokens/src/css/themes/nord.css";
+@import "@spacedrive/tokens/src/css/themes/mocha.css";
 
 /* Tell Tailwind v4 where to scan for utility classes */
 @source "../../../packages/ui/src";

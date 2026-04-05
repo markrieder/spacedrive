@@ -1,5 +1,5 @@
 import { X, FunnelSimple } from "@phosphor-icons/react";
-import { CircleButton } from "@spaceui/primitives";
+import { CircleButton } from "@spacedrive/primitives";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useJobsContext } from "../hooks/JobsContext";

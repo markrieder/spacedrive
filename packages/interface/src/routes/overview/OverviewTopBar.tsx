@@ -9,7 +9,7 @@ import {
 	GearSix,
 	CloudArrowUp,
 } from "@phosphor-icons/react";
-import { Popover, usePopover, CircleButton } from "@spaceui/primitives";
+import { Popover, usePopover, CircleButton } from "@spacedrive/primitives";
 import clsx from "clsx";
 import { TopBarPortal, TopBarItem } from "../../TopBar";
 import { PairingModal } from "../../components/modals/PairingModal";

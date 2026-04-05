@@ -4,7 +4,7 @@ import { Sliders } from "@phosphor-icons/react";
 import { motion, AnimatePresence } from "framer-motion";
 import clsx from "clsx";
 import { useExplorer } from "./context";
-import { CircleButton } from "@spaceui/primitives";
+import { CircleButton } from "@spacedrive/primitives";
 
 interface ViewSettingsPanelProps {
 	viewSettings: any;

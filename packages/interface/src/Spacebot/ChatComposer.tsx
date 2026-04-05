@@ -1,5 +1,5 @@
 import {Microphone, Sparkle} from '@phosphor-icons/react';
-import {ModelSelector, type ModelOption} from '@spaceui/ai';
+import {ModelSelector, type ModelOption} from '@spacedrive/ai';
 import {
 	CircleButton,
 	OptionList,
@@ -7,7 +7,7 @@ import {
 	Popover,
 	SelectPill,
 	usePopover
-} from '@spaceui/primitives';
+} from '@spacedrive/primitives';
 import {AnimatePresence, motion} from 'framer-motion';
 import {useState} from 'react';
 
