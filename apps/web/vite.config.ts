@@ -1,9 +1,10 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 
 export default defineConfig({
-	plugins: [react()],
+	plugins: [react(), tailwindcss()],
 	resolve: {
 		dedupe: ["react", "react-dom"],
 		alias: [
@@ -28,24 +29,46 @@ export default defineConfig({
 				replacement: path.resolve(__dirname, "./node_modules/react-dom/client.js"),
 			},
 			{
-				find: "@spacedrive/tokens/css/themes",
-				replacement: path.resolve(
-					__dirname,
-					"../../../spaceui/packages/tokens/src/css/themes",
-				),
-			},
-			{
-				find: "@spacedrive/tokens/css",
-				replacement: path.resolve(
-					__dirname,
-					"../../../spaceui/packages/tokens/src/css/base.css",
-				),
-			},
-			{
 				find: "@spacedrive/tokens",
 				replacement: path.resolve(
 					__dirname,
-					"../../../spaceui/packages/tokens/src/index.ts",
+					"../../../spaceui/packages/tokens",
+				),
+			},
+			{
+				find: "@spacedrive/ai",
+				replacement: path.resolve(
+					__dirname,
+					"../../../spaceui/packages/ai/src/index.ts",
+				),
+			},
+			{
+				find: "@spacedrive/primitives",
+				replacement: path.resolve(
+					__dirname,
+					"../../../spaceui/packages/primitives/src/index.ts",
+				),
+			},
+			{
+				find: "@spacebot/api-client",
+				replacement: path.resolve(
+					__dirname,
+					"../../../spacebot/packages/api-client/src",
+				),
+			},
+			{
+				find: "@sd/interface",
+				replacement: path.resolve(__dirname, "../../packages/interface/src"),
+			},
+			{
+				find: "@sd/ts-client",
+				replacement: path.resolve(__dirname, "../../packages/ts-client/src"),
+			},
+			{
+				find: "openapi-fetch",
+				replacement: path.resolve(
+					__dirname,
+					"../../packages/interface/node_modules/openapi-fetch/dist/index.mjs",
 				),
 			},
 		],

@@ -471,7 +471,12 @@ export function SpacesSidebar({isPreviewActive = false}: SpacesSidebarProps) {
 						: 'bg-sidebar/65'
 				)}
 			>
-				<nav className="relative z-[51] flex h-full flex-col gap-2.5 p-2.5 pb-2 pt-[43px]">
+				<nav
+					className={clsx(
+						"relative z-[51] flex h-full flex-col gap-2.5 p-2.5 pb-2",
+						platform.platform === "tauri" && "pt-[43px]",
+					)}
+				>
 					{/* Space Switcher */}
 					<SpaceSwitcher
 						spaces={spaces}

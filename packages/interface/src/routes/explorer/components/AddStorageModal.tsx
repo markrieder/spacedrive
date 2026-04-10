@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import {
 	Folder,
 	FolderOpen,
@@ -270,6 +270,8 @@ interface StorageDialogProps {
 	description: React.ReactNode;
 	onSubmit?: any;
 	ctaLabel?: string;
+	ctaDanger?: boolean;
+	submitDisabled?: boolean;
 	loading?: boolean;
 	showBackButton?: boolean;
 	onBack?: () => void;
@@ -285,6 +287,8 @@ function StorageDialog({
 	description,
 	onSubmit,
 	ctaLabel,
+	ctaDanger,
+	submitDisabled,
 	loading,
 	showBackButton,
 	onBack,
@@ -300,6 +304,8 @@ function StorageDialog({
 			icon={icon}
 			description={description}
 			ctaLabel={ctaLabel}
+			ctaDanger={ctaDanger}
+			submitDisabled={submitDisabled}
 			onCancelled={true}
 			loading={loading}
 			formClassName="!min-w-[480px] !max-w-[480px] max-h-[80vh] flex flex-col"
@@ -429,6 +435,11 @@ function AddStorageDialog(props: {
 	// Dummy form for non-form dialogs (to satisfy Dialog component)
 	const dummyForm = useForm();
 
+	// Subscribe to the local form's `path` field so the picker step's
+	// Continue button reacts as the user types into the input.
+	const localPathTyped =
+		useWatch({ control: localForm.control, name: "path" }) || "";
+
 	// Update selected jobs when preset mode changes
 	const currentMode = localForm.watch("mode");
 	const [selectedJobs, setSelectedJobs] = useState<Set<string>>(
@@ -507,6 +518,16 @@ function AddStorageDialog(props: {
 		localForm.setValue("name", name);
 		setStep("local-config");
 	};
+
+	const onSubmitManualPath = localForm.handleSubmit((data) => {
+		const path = (data.path || "").trim();
+		if (!path) return;
+		if (!data.name) {
+			const folderName = path.split("/").filter(Boolean).pop() || path;
+			localForm.setValue("name", folderName);
+		}
+		setStep("local-config");
+	});
 
 	const handleVolumeSelect = async (volume: any) => {
 		try {
@@ -970,11 +991,13 @@ function AddStorageDialog(props: {
 		return (
 			<StorageDialog
 				dialog={dialog}
-				form={dummyForm}
+				form={localForm}
+				onSubmit={onSubmitManualPath}
 				title="Add Local Folder"
 				icon={<Folder size={20} weight="fill" />}
 				description="Choose a folder to index and manage"
-				hideButtons={true}
+				ctaLabel="Continue"
+				submitDisabled={!localPathTyped.trim()}
 				showBackButton={true}
 				onBack={handleBack}
 			>
@@ -983,11 +1006,14 @@ function AddStorageDialog(props: {
 						<Label>Browse</Label>
 						<div className="relative">
 							<Input
-								value={localForm.watch("path") || ""}
+								value={localPathTyped}
 								onChange={(e) =>
-									localForm.setValue("path", e.target.value)
+									localForm.setValue("path", e.target.value, {
+										shouldValidate: true,
+										shouldDirty: true,
+									})
 								}
-								placeholder="Select a custom folder"
+								placeholder="Type or paste a folder path"
 								size="lg"
 								className="pr-14"
 							/>
