@@ -8,6 +8,7 @@
 //! - Content operations (deduplication, statistics)
 //! - Metadata operations (hierarchical tagging)
 
+pub mod adapters;
 pub mod addressing;
 pub mod config;
 // pub mod content;
@@ -25,7 +26,6 @@ pub mod models;
 pub mod network;
 pub mod search;
 pub mod sidecar;
-pub mod adapters;
 pub mod sources;
 pub mod spaces;
 pub mod sync;

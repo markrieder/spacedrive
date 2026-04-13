@@ -296,7 +296,8 @@ impl super::FilesystemHandler for RefsHandler {
 	}
 
 	fn contains_path(&self, volume: &Volume, path: &std::path::Path) -> bool {
-		let normalized_path = crate::common::utils::strip_windows_extended_prefix(path.to_path_buf());
+		let normalized_path =
+			crate::common::utils::strip_windows_extended_prefix(path.to_path_buf());
 
 		if normalized_path.starts_with(&volume.mount_point) {
 			return true;
