@@ -1472,10 +1472,7 @@ impl LibraryManager {
 			.await
 			.map_err(LibraryError::DatabaseError)?;
 
-		info!(
-			"Created default Sources group for library {}",
-			library.id()
-		);
+		info!("Created default Sources group for library {}", library.id());
 
 		Ok(())
 	}

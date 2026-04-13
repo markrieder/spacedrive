@@ -3,9 +3,7 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react-swc';
 import {defineConfig} from 'vite';
 
-const COMMANDS = ['initialize_core', 'core_rpc', 'subscribe_events'];
-
-export default defineConfig(async () => ({
+export default defineConfig(() => ({
 	plugins: [react(), tailwindcss()],
 
 	resolve: {
@@ -126,7 +124,7 @@ export default defineConfig(async () => ({
 	envPrefix: ['VITE_', 'TAURI_ENV_*'],
 	build: {
 		target: ['es2021', 'chrome100', 'safari13'],
-		minify: !process.env.TAURI_ENV_DEBUG ? 'esbuild' : false,
+		minify: !process.env.TAURI_ENV_DEBUG ? ('esbuild' as const) : false,
 		sourcemap: !!process.env.TAURI_ENV_DEBUG
 	}
 }));

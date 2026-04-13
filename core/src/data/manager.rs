@@ -136,10 +136,7 @@ impl SourceManager {
 	}
 
 	/// Sync a source.
-	pub async fn sync_source(
-		&self,
-		source_id: &str,
-	) -> Result<sd_archive::SyncReport, String> {
+	pub async fn sync_source(&self, source_id: &str) -> Result<sd_archive::SyncReport, String> {
 		self.engine
 			.sync(source_id)
 			.await

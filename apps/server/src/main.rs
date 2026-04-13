@@ -15,7 +15,10 @@ use clap::Parser;
 use futures::stream::{Stream, StreamExt};
 use rust_embed::Embed;
 use secstr::SecStr;
-use std::{collections::HashMap, convert::Infallible, net::SocketAddr, path::PathBuf, sync::Arc, time::Duration};
+use std::{
+	collections::HashMap, convert::Infallible, net::SocketAddr, path::PathBuf, sync::Arc,
+	time::Duration,
+};
 use tokio::{
 	io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
 	net::TcpStream,
@@ -135,9 +138,8 @@ async fn events_sse(
 		}
 	});
 
-	let stream = ReceiverStream::new(rx).map(|line| {
-		Ok::<SseEvent, Infallible>(SseEvent::default().data(line))
-	});
+	let stream = ReceiverStream::new(rx)
+		.map(|line| Ok::<SseEvent, Infallible>(SseEvent::default().data(line)));
 
 	Sse::new(stream).keep_alive(
 		KeepAlive::new()
@@ -186,8 +188,7 @@ async fn bridge_daemon_events(
 		// acks and anything else the daemon might emit.
 		match serde_json::from_str::<serde_json::Value>(trimmed) {
 			Ok(value) => {
-				let is_payload = value.get("Event").is_some()
-					|| value.get("LogMessage").is_some();
+				let is_payload = value.get("Event").is_some() || value.get("LogMessage").is_some();
 				if !is_payload {
 					continue;
 				}
