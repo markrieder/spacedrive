@@ -116,8 +116,14 @@ async fn detect_macos_volumes(
 		volumes.extend(converted);
 	}
 
+	// Collect mount points from APFS volumes so the non-APFS detector can skip them
+	let apfs_mount_points: std::collections::HashSet<String> = volumes
+		.iter()
+		.map(|v| v.mount_point.to_string_lossy().to_string())
+		.collect();
+
 	// Detect non-APFS volumes using traditional methods
-	let generic_volumes = detect_generic_volumes_macos(device_id, config).await?;
+	let generic_volumes = detect_generic_volumes_macos(device_id, config, apfs_mount_points).await?;
 	debug!(
 		"MACOS_DETECT: Detected {} generic (non-APFS) volumes",
 		generic_volumes.len()
@@ -184,9 +190,10 @@ async fn detect_windows_volumes(
 async fn detect_generic_volumes_macos(
 	device_id: Uuid,
 	config: &VolumeDetectionConfig,
+	apfs_mount_points: std::collections::HashSet<String>,
 ) -> VolumeResult<Vec<Volume>> {
 	use crate::volume::platform::macos;
-	macos::detect_non_apfs_volumes(device_id, config).await
+	macos::detect_non_apfs_volumes(device_id, config, apfs_mount_points).await
 }
 
 #[cfg(target_os = "ios")]

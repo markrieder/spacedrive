@@ -105,7 +105,7 @@ function getItemLabel(itemType: ItemType, resolvedFile?: File | null): string {
 	if (isFileKindsItem(itemType)) return "File Kinds";
 	if (isSourcesItem(itemType)) return "Sources";
 	if (isLocationItem(itemType)) return resolvedFile?.name || "Unnamed Location";
-	if (isVolumeItem(itemType)) return resolvedFile?.name || "Unnamed Volume";
+	if (isVolumeItem(itemType)) return resolvedFile?.name || (itemType as { Volume: { volume_id: string; name?: string } }).Volume.name || "Unnamed Volume";
 	if (isTagItem(itemType)) return resolvedFile?.name || "Unnamed Tag";
 	if (isPathItem(itemType)) {
 		// Use resolved file name if available, otherwise extract from path
