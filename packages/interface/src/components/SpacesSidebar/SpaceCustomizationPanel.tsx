@@ -70,8 +70,8 @@ function DraggablePaletteItem({ item }: { item: PaletteItem }) {
 				item={mockSpaceItem}
 				allowInsertion={false}
 				onClick={(e) => {
-					e.preventDefault();
-					e.stopPropagation();
+					e?.preventDefault();
+					e?.stopPropagation();
 				}}
 			/>
 		</div>

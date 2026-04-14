@@ -30,7 +30,6 @@ export function OverflowButton({ items }: OverflowButtonProps) {
 				>
 					{items.map((item) => {
 						const isSimpleAction = !!item.onClick;
-						const hasSubmenu = !isSimpleAction;
 
 						if (isSimpleAction) {
 							return (

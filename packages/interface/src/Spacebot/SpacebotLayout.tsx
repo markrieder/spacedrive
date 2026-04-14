@@ -12,8 +12,7 @@ import {
 	OptionListItem,
 	Popover,
 	SearchBar,
-	SelectPill,
-	usePopover
+	SelectPill
 } from '@spacedrive/primitives';
 import {ReactQueryDevtools} from '@tanstack/react-query-devtools';
 import {useEffect, useState} from 'react';
@@ -112,7 +111,7 @@ function SidebarHistory() {
 		return (
 			<SidebarHistoryItem
 				key={conversation.id}
-				conversation={conversation}
+				conversation={conversation as any}
 				isActive={isActive}
 				onClick={() => navigateToConversation(conversation.id)}
 			/>

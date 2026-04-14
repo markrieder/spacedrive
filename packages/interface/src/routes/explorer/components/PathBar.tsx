@@ -3,8 +3,7 @@ import {
 	CircleDashedIcon,
 	CircleIcon,
 	Eye,
-	Folder,
-	RadioButtonIcon
+	Folder
 } from '@phosphor-icons/react';
 import LaptopIcon from '@sd/assets/icons/Laptop.png';
 import type {Device, SdPath} from '@sd/ts-client';
@@ -130,13 +129,13 @@ function IndexIndicator({path}: {path: SdPath}) {
 			const pathStr = path.Physical.path;
 			// Find location with longest matching prefix
 			return locations
-				.filter((loc) => {
+				.filter((loc: any) => {
 					if (!loc.sd_path || !('Physical' in loc.sd_path))
 						return false;
 					const locPath = loc.sd_path.Physical.path;
 					return pathStr.startsWith(locPath);
 				})
-				.sort((a, b) => {
+				.sort((a: any, b: any) => {
 					const aPath =
 						'Physical' in a.sd_path!
 							? a.sd_path!.Physical.path

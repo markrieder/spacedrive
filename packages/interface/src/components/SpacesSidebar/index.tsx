@@ -14,8 +14,9 @@ import {
 	ListBullets,
 	Palette
 } from '@phosphor-icons/react';
-import {useLibraryMutation, useSidebarStore} from '@sd/ts-client';
+import {useSidebarStore} from '@sd/ts-client';
 import type {
+	Space,
 	SpaceGroup as SpaceGroupType,
 	SpaceItem as SpaceItemType
 } from '@sd/ts-client';
@@ -46,7 +47,7 @@ function SpaceGroupWithDropZone({
 	group,
 	items,
 	spaceId,
-	isFirst
+	isFirst: _isFirst
 }: {
 	group: SpaceGroupType;
 	items: SpaceItemType[];
@@ -77,7 +78,7 @@ function SpaceGroupWithDropZone({
 		transform,
 		transition,
 		isDragging,
-		setActivatorNodeRef
+		setActivatorNodeRef: _setActivatorNodeRef
 	} = useSortable({
 		id: group.id,
 		data: {
@@ -401,7 +402,7 @@ export function SpacesSidebar({isPreviewActive = false}: SpacesSidebarProps) {
 	const [customizePanelOpen, setCustomizePanelOpen] = useState(false);
 
 	// Get sync and job status for icons
-	const {onlinePeerCount, isSyncing} = useSyncCount();
+	useSyncCount();
 	const {
 		activeJobCount,
 		hasRunningJobs,
@@ -414,7 +415,7 @@ export function SpacesSidebar({isPreviewActive = false}: SpacesSidebarProps) {
 
 	const {currentSpaceId, setCurrentSpace} = useSidebarStore();
 	const {data: spacesData} = useSpaces();
-	const spaces = spacesData?.spaces;
+	const spaces = (spacesData as any)?.spaces as Space[] | undefined;
 
 	// Listen for library changes from client and update local state
 	useEffect(() => {
@@ -457,9 +458,8 @@ export function SpacesSidebar({isPreviewActive = false}: SpacesSidebarProps) {
 		}
 	}, [currentSpace, currentSpaceId, setCurrentSpace]);
 
-	const {data: layout} = useSpaceLayout(currentSpace?.id ?? null);
-
-	const addItem = useLibraryMutation('spaces.add_item');
+	const {data: layoutData} = useSpaceLayout(currentSpace?.id ?? null);
+	const layout = layoutData as { space_items: SpaceItemType[]; groups: Array<{ group: SpaceGroupType; items: SpaceItemType[] }> } | undefined;
 
 	return (
 		<div className="flex h-full w-[220px] min-w-[176px] max-w-[300px] flex-col bg-transparent p-2">

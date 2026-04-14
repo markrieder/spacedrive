@@ -2,7 +2,6 @@ import { useState, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
 	ArrowLeft,
-	ArrowRight,
 	FolderOpen,
 } from "@phosphor-icons/react";
 import {
@@ -18,10 +17,11 @@ export function AdaptersScreen() {
 	const navigate = useNavigate();
 	const [searchValue, setSearchValue] = useState("");
 
-	const { data: adapters, isLoading } = useLibraryQuery({
+	const { data: adaptersRaw, isLoading } = useLibraryQuery({
 		type: "adapters.list",
 		input: {},
 	});
+	const adapters = adaptersRaw as any[] | undefined;
 
 	const [selectedAdapter, setSelectedAdapter] = useState<string | null>(null);
 	const selected = adapters?.find((a) => a.id === selectedAdapter);
@@ -243,7 +243,7 @@ function ConfigureForm({
 			const source = await createSource.mutateAsync({
 				name: name.trim(),
 				adapter_id: adapterId,
-				config,
+				config: config as any,
 			});
 
 			// Dispatch sync as a background job

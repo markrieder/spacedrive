@@ -12,7 +12,7 @@ import {TopBarItem, TopBarPortal} from '../../TopBar';
 import {ExpandableSearchButton} from './components/ExpandableSearchButton';
 import {PathBar} from './components/PathBar';
 import {VirtualPathBar} from './components/VirtualPathBar';
-import {useExplorer} from './context';
+import {useExplorer, type ViewMode} from './context';
 import {useVirtualListing} from './hooks/useVirtualListing';
 import {SearchToolbar} from './SearchToolbar';
 import {SortMenu, SortMenuPanel} from './SortMenu';
@@ -34,7 +34,6 @@ export function ExplorerView() {
 		setSidebarVisible,
 		inspectorVisible,
 		setInspectorVisible,
-		activeTabId,
 		tagModeActive,
 		setTagModeActive,
 		viewMode,
@@ -110,7 +109,7 @@ export function ExplorerView() {
 			) {
 				navigateToPath(columnStack[columnStack.length - 1]);
 			}
-			setViewMode(newMode);
+			setViewMode(newMode as ViewMode);
 		},
 		[viewMode, columnStack, navigateToPath, setViewMode]
 	);

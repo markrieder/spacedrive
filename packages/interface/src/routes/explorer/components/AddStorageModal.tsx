@@ -29,9 +29,8 @@ import type {
 	RiskLevel,
 	ValidationWarning as PathValidationWarning,
 	VolumeIndexingSuggestion,
-	IndexVolumeInput,
 } from "@sd/ts-client";
-import { useLibraryMutation, useLibraryQuery, useCoreQuery, useSpacedriveClient } from "../../../contexts/SpacedriveContext";
+import { useLibraryMutation, useLibraryQuery, useSpacedriveClient } from "../../../contexts/SpacedriveContext";
 import { usePlatform } from "../../../contexts/PlatformContext";
 import clsx from "clsx";
 
@@ -46,7 +45,6 @@ import DriveDropbox from "@sd/assets/icons/Drive-Dropbox.png";
 import DriveOneDrive from "@sd/assets/icons/Drive-OneDrive.png";
 import DriveBackBlaze from "@sd/assets/icons/Drive-BackBlaze.png";
 import DrivePCloud from "@sd/assets/icons/Drive-PCloud.png";
-import DriveMega from "@sd/assets/icons/Drive-Mega.png";
 import DriveDAV from "@sd/assets/icons/Drive-DAV.png";
 import DriveBox from "@sd/assets/icons/Drive-Box.png";
 
@@ -532,7 +530,7 @@ function AddStorageDialog(props: {
 	const handleVolumeSelect = async (volume: any) => {
 		try {
 			// Step 1: Track the volume
-			const trackResult = await trackVolume.mutateAsync({
+			await trackVolume.mutateAsync({
 				fingerprint: volume.fingerprint,
 				display_name: volume.display_name || volume.name,
 			});
@@ -553,8 +551,8 @@ function AddStorageDialog(props: {
 			const locationResult = await addLocation.mutateAsync(locationInput);
 			dialog.state.open = false;
 
-			if (locationResult?.id && props.onStorageAdded) {
-				props.onStorageAdded(locationResult.id);
+			if (locationResult?.location_id && props.onStorageAdded) {
+				props.onStorageAdded(locationResult.location_id);
 			}
 		} catch (error) {
 			console.error("Failed to track volume and add location:", error);
@@ -572,9 +570,9 @@ function AddStorageDialog(props: {
 			},
 		};
 
-		let validation;
+		let validation: { risk_level: RiskLevel; warnings: PathValidationWarning[]; suggested_alternative: VolumeIndexingSuggestion | null } | undefined;
 		try {
-			validation = await client.execute("query:locations.validate_path", validateInput);
+			validation = await client.execute("query:locations.validate_path", validateInput) as any;
 			console.log("Validation result:", validation);
 		} catch (error) {
 			console.error("Failed to validate path:", error);
@@ -618,8 +616,8 @@ function AddStorageDialog(props: {
 			const result = await addLocation.mutateAsync(input);
 			dialog.state.open = false;
 
-			if (result?.id && props.onStorageAdded) {
-				props.onStorageAdded(result.id);
+			if (result?.location_id && props.onStorageAdded) {
+				props.onStorageAdded(result.location_id);
 			}
 		} catch (error) {
 			console.error("Failed to add location:", error);
@@ -701,7 +699,7 @@ function AddStorageDialog(props: {
 
 		try {
 			// Step 1: Add the cloud volume and get fingerprint
-			const volumeResult = await addCloudVolume.mutateAsync(volumeInput);
+			await addCloudVolume.mutateAsync(volumeInput);
 
 			// Determine the cloud identifier based on provider type
 			let cloudIdentifier: string;
@@ -743,8 +741,8 @@ function AddStorageDialog(props: {
 			const locationResult = await addLocation.mutateAsync(locationInput);
 			dialog.state.open = false;
 
-			if (locationResult?.id && props.onStorageAdded) {
-				props.onStorageAdded(locationResult.id);
+			if (locationResult?.location_id && props.onStorageAdded) {
+				props.onStorageAdded(locationResult.location_id);
 			}
 		} catch (error) {
 			console.error("Failed to add cloud storage:", error);
@@ -959,7 +957,7 @@ function AddStorageDialog(props: {
 										</div>
 										<div className="text-xs text-ink-faint">
 											{volume.mount_point} •{" "}
-											{volume.filesystem}
+											{typeof volume.file_system === 'string' ? volume.file_system : (volume.file_system as any)?.Other ?? 'Unknown'}
 										</div>
 									</div>
 									<div className="text-xs text-ink-dull">

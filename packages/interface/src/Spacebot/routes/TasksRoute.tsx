@@ -1,7 +1,7 @@
 import {
 	apiClient,
 	type Task,
-	type TaskStatus,
+
 	type UpdateTaskRequest,
 } from '@spacebot/api-client';
 import {
@@ -46,12 +46,12 @@ export function TasksRoute() {
 
 	const updateMutation = useMutation({
 		mutationFn: ({taskNumber, req}: {taskNumber: number; req: UpdateTaskRequest}) =>
-			apiClient.updateTask(taskNumber, req),
+			(apiClient as any).updateTask(taskNumber, req),
 		onSuccess: () => void invalidate(),
 	});
 
 	const deleteMutation = useMutation({
-		mutationFn: (taskNumber: number) => apiClient.deleteTask(taskNumber),
+		mutationFn: (taskNumber: number) => (apiClient as any).deleteTask(taskNumber),
 		onSuccess: () => {
 			setActiveTaskId(null);
 			void invalidate();

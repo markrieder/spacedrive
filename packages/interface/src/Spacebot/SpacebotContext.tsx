@@ -3,7 +3,6 @@ import {
 	CalendarDots,
 	ChatCircleDots,
 	Checks,
-	DotsThree,
 	MoonStars
 } from '@phosphor-icons/react';
 import {Ball, BallBlue} from '@sd/assets/images';
@@ -18,7 +17,7 @@ import {
 	type PortalConversationSummary,
 	type TypingStateEvent
 } from '@spacebot/api-client';
-import {SearchBar, usePopover} from '@spacedrive/primitives';
+import {usePopover} from '@spacedrive/primitives';
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query';
 import {
 	createContext,
@@ -74,7 +73,7 @@ export const models = [
 	}
 ];
 
-interface SpacebotContextType {
+export interface SpacebotContextType {
 	// Navigation state
 	search: string;
 	setSearch: (value: string) => void;

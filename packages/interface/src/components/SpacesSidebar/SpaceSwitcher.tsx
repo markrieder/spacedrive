@@ -1,4 +1,4 @@
-import {CaretDown, GearSix, Plus} from '@phosphor-icons/react';
+import {GearSix, Plus} from '@phosphor-icons/react';
 import type {Space} from '@sd/ts-client';
 import {DropdownMenu, SelectPill} from '@spacedrive/primitives';
 import clsx from 'clsx';

@@ -26,7 +26,7 @@ import { useEffect, useMemo, useState, useRef } from "react";
 import { useQuery, useQueryClient, QueryClient } from "@tanstack/react-query";
 import { useSpacedriveClient } from "./useClient";
 import type { Event } from "../generated/types";
-import type { SdPath } from "../types";
+import type { SdPath } from "../generated/types";
 import invariant from "tiny-invariant";
 import * as v from "valibot";
 import type { Simplify } from "type-fest";
@@ -423,7 +423,6 @@ export function filterBatchResources(
 		options.resourceType === "file" &&
 		!options.includeDescendants
 	) {
-		const beforeCount = filtered.length;
 		filtered = filtered.filter((resource: any) => {
 			// Get the scope path (must be Physical)
 			const scopeStr = (options.pathScope as any).Physical?.path;

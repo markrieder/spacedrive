@@ -3,7 +3,7 @@ import { Popover, usePopover, CircleButton } from "@spacedrive/primitives";
 import clsx from "clsx";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { JobList } from "./components/JobList";
 import { useJobsContext } from "./hooks/JobsContext";
 import { CARD_HEIGHT } from "./types";
@@ -104,7 +104,7 @@ export function JobManagerPopover({ className }: JobManagerPopoverProps) {
 function JobManagerPopoverContent({
   jobs,
   showOnlyRunning,
-  setShowOnlyRunning,
+  setShowOnlyRunning: _setShowOnlyRunning,
   pause,
   resume,
   cancel,

@@ -10,10 +10,11 @@ import { SearchBar } from "@spacedrive/primitives";
 export function SourcesHome() {
 	const navigate = useNavigate();
 	const { createTab } = useTabManager();
-	const { data: sources, isLoading, error } = useLibraryQuery({
+	const { data: sourcesRaw, isLoading, error } = useLibraryQuery({
 		type: "sources.list",
 		input: { data_type: null },
 	});
+	const sources = sourcesRaw as any[] | undefined;
 
 	return (
 		<>

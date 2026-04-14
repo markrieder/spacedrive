@@ -227,8 +227,8 @@ function AddLocationDialog(props: {
       dialog.state.open = false;
 
       // Call the callback to navigate to the new location
-      if (result?.id && props.onLocationAdded) {
-        props.onLocationAdded(result.id);
+      if (result?.location_id && props.onLocationAdded) {
+        props.onLocationAdded(result.location_id);
       }
     } catch (error) {
       console.error("Failed to add location:", error);

@@ -1,7 +1,7 @@
+import type {Icon} from '@phosphor-icons/react';
 import {
 	Camera,
 	ChartPieSlice,
-	Clock,
 	Columns,
 	GridFour,
 	Rows,
@@ -19,7 +19,7 @@ type ViewMode = 'list' | 'grid' | 'column' | 'media' | 'size' | 'knowledge';
 interface ViewOption {
 	id: ViewMode | 'timeline';
 	label: string;
-	icon: React.ElementType;
+	icon: Icon;
 	color: string;
 	keybind: string;
 }

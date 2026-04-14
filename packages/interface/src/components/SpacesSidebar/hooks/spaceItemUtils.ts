@@ -2,7 +2,6 @@ import {
 	House,
 	Clock,
 	Heart,
-	Folder,
 	HardDrive,
 	Tag as TagIcon,
 	Folders,
@@ -105,9 +104,9 @@ function getItemLabel(itemType: ItemType, resolvedFile?: File | null): string {
 	if (isFavoritesItem(itemType)) return "Favorites";
 	if (isFileKindsItem(itemType)) return "File Kinds";
 	if (isSourcesItem(itemType)) return "Sources";
-	if (isLocationItem(itemType)) return itemType.Location.name || "Unnamed Location";
-	if (isVolumeItem(itemType)) return itemType.Volume.name || "Unnamed Volume";
-	if (isTagItem(itemType)) return itemType.Tag.name || "Unnamed Tag";
+	if (isLocationItem(itemType)) return resolvedFile?.name || "Unnamed Location";
+	if (isVolumeItem(itemType)) return resolvedFile?.name || "Unnamed Volume";
+	if (isTagItem(itemType)) return resolvedFile?.name || "Unnamed Tag";
 	if (isPathItem(itemType)) {
 		// Use resolved file name if available, otherwise extract from path
 		if (resolvedFile?.name) return resolvedFile.name;

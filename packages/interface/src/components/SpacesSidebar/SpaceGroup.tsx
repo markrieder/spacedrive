@@ -43,6 +43,7 @@ export function SpaceGroup({
 		try {
 			await updateGroup.mutateAsync({
 				group_id: group.id,
+				name: null,
 				is_collapsed: !isCollapsed,
 			});
 		} catch (error) {

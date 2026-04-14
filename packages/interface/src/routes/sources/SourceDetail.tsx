@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from "react-router-dom";
-import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import {
 	ArrowLeft,
@@ -120,14 +120,6 @@ export function SourceDetail() {
 			el.scrollTo({ top, behavior });
 		},
 	});
-
-	// Load more when scrolling near bottom
-	const loadMore = useCallback(async () => {
-		if (loadingMore || !hasMore || !sourceId) return;
-		setLoadingMore(true);
-		// We can't use useLibraryQuery for imperative fetches,
-		// so we'll bump the offset and let a new query handle it
-	}, [loadingMore, hasMore, sourceId]);
 
 	// Fetch next page
 	const { data: nextPage } = useLibraryQuery(

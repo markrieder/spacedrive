@@ -319,9 +319,9 @@ function StatCard({
 	label,
 	value,
 	subtitle,
-	progress,
+	progress: _progress,
 	pulse,
-	color,
+	color: _color,
 	badge
 }: StatCardProps) {
 	return (

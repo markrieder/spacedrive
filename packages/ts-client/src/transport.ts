@@ -4,7 +4,7 @@
  */
 
 import { DEFAULT_EVENT_SUBSCRIPTION } from "./event-filter";
-import type { SdPath } from "./types";
+import type { SdPath } from "./generated/types";
 
 export interface EventFilter {
 	library_id?: string;
@@ -131,10 +131,10 @@ export class TcpSocketTransport implements Transport {
 						const requestLine = JSON.stringify(request) + "\n";
 						socket.write(requestLine);
 					},
-					error(socket: any, error: Error) {
+					error(_socket: any, error: Error) {
 						reject(error);
 					},
-					close(socket: any) {
+					close(_socket: any) {
 						if (buffer && !buffer.includes("\n")) {
 							reject(new Error("Connection closed without complete response"));
 						}
@@ -168,7 +168,7 @@ export class TcpSocketTransport implements Transport {
 			hostname,
 			port,
 			socket: {
-				data(socket: any, data: any) {
+				data(_socket: any, data: any) {
 					buffer += new TextDecoder().decode(data);
 
 					let newlineIndex: number;
@@ -205,10 +205,10 @@ export class TcpSocketTransport implements Transport {
 					// Send subscription request once connected
 					socket.write(JSON.stringify(subscribeRequest) + "\n");
 				},
-				error(socket: any, error: Error) {
+				error(_socket: any, error: Error) {
 					console.error("[TcpSocketTransport] Socket error:", error);
 				},
-				close(socket: any) {
+				close(_socket: any) {
 					console.log("[TcpSocketTransport] Connection closed");
 				},
 			},

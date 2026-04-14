@@ -32,8 +32,8 @@ export function ConversationRoute() {
 	return (
 		<ConversationScreen
 			agentId={selectedAgent}
-			conversation={conversation}
-			messages={messages}
+			conversation={conversation ?? null}
+			messages={messages as any}
 			isTyping={isTyping}
 			streamingAssistantText={streamingAssistantText}
 			draft={draft}

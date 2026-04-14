@@ -24,7 +24,7 @@ interface TagSelectorProps {
 export function TagSelector({
 	onSelect,
 	onClose,
-	contextTags = [],
+	contextTags: _contextTags = [],
 	autoFocus = true,
 	className,
 	fileId,
@@ -37,7 +37,7 @@ export function TagSelector({
 
 	// Fetch all tags using search with empty query
 	// Using select to normalize TagSearchResult[] to Tag[] for consistent cache structure
-	const { data: allTags = [] } = useNormalizedQuery({
+	const { data: allTags = [] } = useNormalizedQuery<{query: string}, any, Tag[]>({
 		query: 'tags.search',
 		input: { query: '' },
 		resourceType: 'tag',
@@ -100,13 +100,24 @@ export function TagSelector({
 			const color = `#${Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0')}`;
 			const result = await createTag.mutateAsync({
 				canonical_name: query.trim(),
+				display_name: null,
+				formal_name: null,
+				abbreviation: null,
 				aliases: [],
+				namespace: null,
+				tag_type: null,
 				color,
+				icon: null,
+				description: null,
+				is_organizational_anchor: null,
+				privacy_level: null,
+				search_weight: null,
+				attributes: null,
 				apply_to: contentId
 					? { type: 'Content', ids: [contentId] }
 					: fileId
 					? { type: 'Entry', ids: [parseInt(fileId)] }
-					: undefined,
+					: null,
 			});
 
 			// Construct a Tag object from the result to pass to onSelect
