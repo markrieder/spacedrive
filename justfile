@@ -54,6 +54,28 @@ check:
 fmt:
     cargo fmt
 
+# Link SpaceUI packages for local development.
+spaceui-link:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [ ! -d ../spaceui/packages ]; then
+        echo "Error: ../spaceui not found. Clone it adjacent to this repo:"
+        echo "  git clone https://github.com/spacedriveapp/spaceui ../spaceui"
+        exit 1
+    fi
+    cd ../spaceui
+    bun install && bun run build --filter='@spacedrive/primitives' --filter='@spacedrive/ai' --filter='@spacedrive/forms' --filter='@spacedrive/explorer' --filter='@spacedrive/tokens'
+    for pkg in primitives ai forms explorer tokens; do
+        cd packages/$pkg && bun link && cd ../..
+    done
+    cd "{{justfile_directory()}}/packages/interface"
+    bun link @spacedrive/primitives @spacedrive/ai @spacedrive/forms @spacedrive/explorer @spacedrive/tokens
+    echo "SpaceUI packages linked successfully."
+
+# Unlink SpaceUI packages and restore npm versions.
+spaceui-unlink:
+    cd packages/interface && bun unlink @spacedrive/primitives @spacedrive/ai @spacedrive/forms @spacedrive/explorer @spacedrive/tokens && bun install
+
 # Run the CLI
 cli *ARGS:
     cargo run --bin sd-cli -- {{ARGS}}
