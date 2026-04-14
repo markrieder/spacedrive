@@ -4,7 +4,7 @@
  */
 
 import { DEFAULT_EVENT_SUBSCRIPTION } from "./event-filter";
-import type { SdPath } from "./types";
+import type { SdPath } from "./generated/types";
 
 export interface EventFilter {
 	library_id?: string;
@@ -131,10 +131,10 @@ export class TcpSocketTransport implements Transport {
 						const requestLine = JSON.stringify(request) + "\n";
 						socket.write(requestLine);
 					},
-					error(socket: any, error: Error) {
+					error(_socket: any, error: Error) {
 						reject(error);
 					},
-					close(socket: any) {
+					close(_socket: any) {
 						if (buffer && !buffer.includes("\n")) {
 							reject(new Error("Connection closed without complete response"));
 						}
@@ -168,7 +168,7 @@ export class TcpSocketTransport implements Transport {
 			hostname,
 			port,
 			socket: {
-				data(socket: any, data: any) {
+				data(_socket: any, data: any) {
 					buffer += new TextDecoder().decode(data);
 
 					let newlineIndex: number;
@@ -205,10 +205,10 @@ export class TcpSocketTransport implements Transport {
 					// Send subscription request once connected
 					socket.write(JSON.stringify(subscribeRequest) + "\n");
 				},
-				error(socket: any, error: Error) {
+				error(_socket: any, error: Error) {
 					console.error("[TcpSocketTransport] Socket error:", error);
 				},
-				close(socket: any) {
+				close(_socket: any) {
 					console.log("[TcpSocketTransport] Connection closed");
 				},
 			},
@@ -220,6 +220,82 @@ export class TcpSocketTransport implements Transport {
 				socketInstance.end();
 			}
 		};
+	}
+}
+
+/**
+ * HTTP transport for browser environments talking to sd-server.
+ *
+ * RPC requests are POSTed to `${baseUrl}/rpc` as JSON. Subscriptions open
+ * an EventSource against `${baseUrl}/events` — sd-server bridges the
+ * daemon's event stream into SSE messages so the browser receives Event
+ * and LogMessage payloads in real time.
+ */
+export class HttpTransport implements Transport {
+	private baseUrl: string;
+
+	constructor(baseUrl: string = "") {
+		// Strip trailing slash so `${baseUrl}/rpc` is well-formed.
+		this.baseUrl = baseUrl.replace(/\/$/, "");
+	}
+
+	async sendRequest(request: any): Promise<any> {
+		const response = await fetch(`${this.baseUrl}/rpc`, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify(request),
+		});
+
+		if (!response.ok) {
+			const text = await response.text().catch(() => "");
+			throw new Error(
+				`RPC ${response.status} ${response.statusText}${text ? `: ${text}` : ""}`,
+			);
+		}
+
+		return await response.json();
+	}
+
+	async subscribe(
+		callback: (event: any) => void,
+		_options?: SubscriptionOptions,
+	): Promise<() => void> {
+		// sd-server's /events endpoint forwards every Event/LogMessage line
+		// from the daemon as an SSE message. We don't pass per-subscription
+		// filter options yet — the daemon's broadcast covers everything and
+		// the client can filter on its end if needed.
+		const url = `${this.baseUrl}/events`;
+		const source = new EventSource(url);
+
+		source.onmessage = (e) => {
+			let parsed: any;
+			try {
+				parsed = JSON.parse(e.data);
+			} catch (err) {
+				console.error("[HttpTransport] Failed to parse SSE event:", err);
+				return;
+			}
+
+			// Match the shape the existing transports forward: callback gets
+			// the inner Event payload (or LogMessage payload), not the
+			// DaemonResponse envelope.
+			if (parsed && typeof parsed === "object") {
+				if (parsed.Event !== undefined) {
+					callback(parsed.Event);
+				} else if (parsed.LogMessage !== undefined) {
+					callback(parsed.LogMessage);
+				}
+			}
+		};
+
+		source.onerror = (e) => {
+			// EventSource auto-reconnects on transient failures. We log once
+			// and let the browser retry — there's nothing useful to do at
+			// this layer beyond surfacing it.
+			console.warn("[HttpTransport] SSE connection error", e);
+		};
+
+		return () => source.close();
 	}
 }
 
