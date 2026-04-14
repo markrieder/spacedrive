@@ -22,7 +22,7 @@
 </p>
 
 <p align="center">
-  <a href="https://spacedrive.com"><strong>spacedrive.com</strong></a> &bull;
+  <a href="https://v2.spacedrive.com"><strong>v2.spacedrive.com</strong></a> &bull;
   <a href="https://discord.gg/gTaF2Z44f5">Discord</a> &bull;
   <a href="#getting-started">Getting Started</a>
 </p>
