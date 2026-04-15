@@ -42,23 +42,23 @@ export default defineConfig({
 							replacement: `${spaceui}/tokens/src/css/themes/$1.css`,
 						},
 						{
-							find: "@spacedrive/tokens/theme",
+							find: /^@spacedrive\/tokens\/theme$/,
 							replacement: `${spaceui}/tokens/src/css/theme.css`,
 						},
 						{
-							find: "@spacedrive/tokens/css",
+							find: /^@spacedrive\/tokens\/css$/,
 							replacement: `${spaceui}/tokens/src/css/base.css`,
 						},
 						{
-							find: "@spacedrive/tokens",
+							find: /^@spacedrive\/tokens$/,
 							replacement: `${spaceui}/tokens`,
 						},
 						{
-							find: "@spacedrive/ai",
+							find: /^@spacedrive\/ai$/,
 							replacement: `${spaceui}/ai/src/index.ts`,
 						},
 						{
-							find: "@spacedrive/primitives",
+							find: /^@spacedrive\/primitives$/,
 							replacement: `${spaceui}/primitives/src/index.ts`,
 						},
 					]
