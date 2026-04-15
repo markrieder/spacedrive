@@ -113,7 +113,7 @@ export default defineConfig({
 		sourcemap: true,
 		rollupOptions: {
 			external: [
-				"@spacebot/api-client",
+				...(!hasSpacebot ? ["@spacebot/api-client"] : []),
 			],
 		},
 	},

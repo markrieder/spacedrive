@@ -133,6 +133,11 @@ export default defineConfig(() => ({
 	build: {
 		target: ['es2021', 'chrome100', 'safari13'],
 		minify: !process.env.TAURI_ENV_DEBUG ? ('esbuild' as const) : false,
-		sourcemap: !!process.env.TAURI_ENV_DEBUG
+		sourcemap: !!process.env.TAURI_ENV_DEBUG,
+		rollupOptions: {
+			external: [
+				...(!hasSpacebot ? ['@spacebot/api-client'] : []),
+			],
+		},
 	}
 }));
