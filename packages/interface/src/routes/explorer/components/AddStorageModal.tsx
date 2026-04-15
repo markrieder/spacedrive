@@ -360,7 +360,7 @@ const jobOptions: JobOption[] = [
 ];
 
 export function useAddStorageDialog(
-	onStorageAdded?: (id: string) => void,
+	onStorageAdded?: (sdPath: any) => void,
 	initialPath?: string,
 ) {
 	return dialogManager.create((props) => (
@@ -374,7 +374,7 @@ export function useAddStorageDialog(
 
 function AddStorageDialog(props: {
 	id: number;
-	onStorageAdded?: (id: string) => void;
+	onStorageAdded?: (sdPath: any) => void;
 	initialPath?: string;
 }) {
 	const dialog = useDialog(props);
@@ -551,8 +551,8 @@ function AddStorageDialog(props: {
 			const locationResult = await addLocation.mutateAsync(locationInput);
 			dialog.state.open = false;
 
-			if (locationResult?.location_id && props.onStorageAdded) {
-				props.onStorageAdded(locationResult.location_id);
+			if (locationResult?.path && props.onStorageAdded) {
+				props.onStorageAdded(locationResult.path);
 			}
 		} catch (error) {
 			console.error("Failed to track volume and add location:", error);
@@ -616,8 +616,8 @@ function AddStorageDialog(props: {
 			const result = await addLocation.mutateAsync(input);
 			dialog.state.open = false;
 
-			if (result?.location_id && props.onStorageAdded) {
-				props.onStorageAdded(result.location_id);
+			if (result?.path && props.onStorageAdded) {
+				props.onStorageAdded(result.path);
 			}
 		} catch (error) {
 			console.error("Failed to add location:", error);
@@ -741,8 +741,8 @@ function AddStorageDialog(props: {
 			const locationResult = await addLocation.mutateAsync(locationInput);
 			dialog.state.open = false;
 
-			if (locationResult?.location_id && props.onStorageAdded) {
-				props.onStorageAdded(locationResult.location_id);
+			if (locationResult?.path && props.onStorageAdded) {
+				props.onStorageAdded(locationResult.path);
 			}
 		} catch (error) {
 			console.error("Failed to add cloud storage:", error);

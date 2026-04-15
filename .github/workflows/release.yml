@@ -44,6 +44,16 @@ jobs:
         env:
           TARGET_TRIPLE: ${{ matrix.settings.target }}
 
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: "1.3.4"
+
+      - name: Build web frontend
+        run: |
+          bun install
+          cd apps/web && bun run build
+
       - name: Build server binary
         run: |
           cargo build --release --bin sd-server --features sd-core/heif,sd-core/ffmpeg,sd-core/ai --target ${{ matrix.settings.target }}

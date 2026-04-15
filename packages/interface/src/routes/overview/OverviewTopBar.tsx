@@ -88,8 +88,8 @@ export function OverviewTopBar({ libraryName }: OverviewTopBarProps) {
 	);
 
 	const handleAddStorage = () => {
-		useAddStorageDialog((id) => {
-			navigate(`/location/${id}`);
+		useAddStorageDialog((sdPath) => {
+			navigate(`/explorer?path=${encodeURIComponent(JSON.stringify(sdPath))}`);
 		});
 	};
 

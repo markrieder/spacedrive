@@ -123,7 +123,8 @@ async fn detect_macos_volumes(
 		.collect();
 
 	// Detect non-APFS volumes using traditional methods
-	let generic_volumes = detect_generic_volumes_macos(device_id, config, apfs_mount_points).await?;
+	let generic_volumes =
+		detect_generic_volumes_macos(device_id, config, apfs_mount_points).await?;
 	debug!(
 		"MACOS_DETECT: Detected {} generic (non-APFS) volumes",
 		generic_volumes.len()
