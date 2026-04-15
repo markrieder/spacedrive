@@ -38,6 +38,18 @@ export default defineConfig({
 			...(hasSpaceui
 				? [
 						{
+							find: /^@spacedrive\/tokens\/css\/themes\/(.+)$/,
+							replacement: `${spaceui}/tokens/src/css/themes/$1.css`,
+						},
+						{
+							find: "@spacedrive/tokens/theme",
+							replacement: `${spaceui}/tokens/src/css/theme.css`,
+						},
+						{
+							find: "@spacedrive/tokens/css",
+							replacement: `${spaceui}/tokens/src/css/base.css`,
+						},
+						{
 							find: "@spacedrive/tokens",
 							replacement: `${spaceui}/tokens`,
 						},
