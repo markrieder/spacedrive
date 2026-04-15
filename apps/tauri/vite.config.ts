@@ -138,6 +138,6 @@ export default defineConfig(() => ({
 			external: [
 				...(!hasSpacebot ? ['@spacebot/api-client'] : []),
 			],
-		},
+		}
 	}
 }));
