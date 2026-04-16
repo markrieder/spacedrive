@@ -145,12 +145,19 @@ pub fn is_system_mount_point(mount_point: &Path) -> bool {
 ///
 /// Catches Docker/Kubernetes layer mounts, snap packages, ZFS snapshot
 /// directories, and TrueNAS Scale's iX Apps (each app creates many
-/// nested ZFS datasets under `ix-applications/`).
+/// nested ZFS datasets under `ix-applications/` — and the root of that
+/// hierarchy itself should also be hidden).
 #[cfg(target_os = "linux")]
 pub fn is_nested_app_mount(mount_point: &Path) -> bool {
 	let path_str = mount_point.to_string_lossy();
-	path_str.contains("/.ix-apps/")
-		|| path_str.contains("/ix-applications/")
+
+	// Match root directories as well as anything under them
+	let is_under = |needle: &str| -> bool {
+		path_str.contains(&format!("/{needle}/")) || path_str.ends_with(&format!("/{needle}"))
+	};
+
+	is_under(".ix-apps")
+		|| is_under("ix-applications")
 		|| path_str.contains("/docker/overlay2/")
 		|| path_str.contains("/containerd/")
 		|| path_str.contains("/kubelet/")
