@@ -4,7 +4,13 @@ import { useNormalizedQuery } from "../../../contexts/SpacedriveContext";
 import { useExplorer } from "../context";
 import { useVirtualListing } from "./useVirtualListing";
 
-export type FileSource = "search" | "virtual" | "directory" | "recents" | "tag";
+export type FileSource =
+	| "search"
+	| "virtual"
+	| "directory"
+	| "recents"
+	| "filtered"
+	| "tag";
 
 export interface ExplorerFilesResult {
 	files: File[];
@@ -16,11 +22,12 @@ export interface ExplorerFilesResult {
  * Centralized hook for fetching files in the explorer.
  *
  * Handles file sources with priority:
- * 1. Tag mode (when viewing files by tag)
- * 2. Search results (when in search mode)
- * 3. Recents (when in recents mode)
- * 4. Virtual listings (devices/volumes/locations)
- * 5. Directory listings (normal file browsing)
+ * 1. Filtered mode (e.g. redundancy views with pre-applied SearchFilters)
+ * 2. Tag mode (when viewing files by tag)
+ * 3. Search results (when in search mode)
+ * 4. Recents (when in recents mode)
+ * 5. Virtual listings (devices/volumes/locations)
+ * 6. Directory listings (normal file browsing)
  */
 export function useExplorerFiles(): ExplorerFilesResult {
 	const explorer = useExplorer();
@@ -32,6 +39,7 @@ export function useExplorerFiles(): ExplorerFilesResult {
 	// Check mode types
 	const isSearchMode = mode.type === "search";
 	const isRecentsMode = mode.type === "recents";
+	const isFilteredMode = mode.type === "filtered";
 	const isTagMode = mode.type === "tag";
 
 	// Build search query input
@@ -70,6 +78,11 @@ export function useExplorerFiles(): ExplorerFilesResult {
 				content_types: null,
 				include_hidden: null,
 				include_archived: null,
+				at_risk: null,
+				on_volumes: null,
+				not_on_volumes: null,
+				min_volume_count: null,
+				max_volume_count: null,
 			},
 			mode: "Normal",
 			sort: {
@@ -82,6 +95,40 @@ export function useExplorerFiles(): ExplorerFilesResult {
 			},
 		};
 	}, [isSearchMode, mode, currentPath, sortBy]);
+
+	// Build filtered query input (pre-applied SearchFilters, e.g. redundancy views)
+	const filteredQueryInput = useMemo<FileSearchInput | null>(() => {
+		if (!isFilteredMode || mode.type !== "filtered") return null;
+
+		const searchSortField = (() => {
+			if (!sortBy) return "Size" as const;
+			const sortMap: Record<
+				string,
+				"Relevance" | "Name" | "Size" | "ModifiedAt" | "CreatedAt"
+			> = {
+				name: "Name",
+				size: "Size",
+				modified: "ModifiedAt",
+				type: "Size",
+			};
+			return sortMap[sortBy] || "Size";
+		})();
+
+		return {
+			query: "",
+			scope: "Library",
+			filters: mode.filters,
+			mode: "Fast",
+			sort: {
+				field: searchSortField,
+				direction: "Desc",
+			},
+			pagination: {
+				limit: 1000,
+				offset: 0,
+			},
+		};
+	}, [isFilteredMode, mode, sortBy]);
 
 	// Build recents query input
 	const recentsQueryInput = useMemo<FileSearchInput | null>(() => {
@@ -99,6 +146,11 @@ export function useExplorerFiles(): ExplorerFilesResult {
 				content_types: null,
 				include_hidden: null,
 				include_archived: null,
+				at_risk: null,
+				on_volumes: null,
+				not_on_volumes: null,
+				min_volume_count: null,
+				max_volume_count: null,
 			},
 			mode: "Fast", // Fast mode since we're just sorting by indexed_at
 			sort: {
@@ -132,6 +184,14 @@ export function useExplorerFiles(): ExplorerFilesResult {
 		enabled: isRecentsMode && !!recentsQueryInput,
 	});
 
+	// Filtered query (pre-applied SearchFilters)
+	const filteredQuery = useNormalizedQuery<FileSearchInput, FileSearchOutput>({
+		query: "search.files",
+		input: filteredQueryInput!,
+		resourceType: "file",
+		enabled: isFilteredMode && !!filteredQueryInput,
+	});
+
 	// Tag query — fetches files tagged with a specific tag
 	const tagQueryInput = useMemo(() => {
 		if (!isTagMode || mode.type !== "tag") return null;
@@ -162,22 +222,35 @@ export function useExplorerFiles(): ExplorerFilesResult {
 				}
 			: null!,
 		resourceType: "file",
-		enabled: !!currentPath && !isVirtualView && !isSearchMode && !isRecentsMode && !isTagMode,
+		enabled:
+			!!currentPath &&
+			!isVirtualView &&
+			!isSearchMode &&
+			!isRecentsMode &&
+			!isFilteredMode &&
+			!isTagMode,
 		pathScope: currentPath ?? undefined,
 	});
 
-	// Determine source and files with priority: tag > recents > search > virtual > directory
-	const source: FileSource = isTagMode
-		? "tag"
-		: isRecentsMode
-			? "recents"
-			: isSearchMode
-				? "search"
-				: isVirtualView
-					? "virtual"
-					: "directory";
+	// Priority: filtered > tag > recents > search > virtual > directory
+	const source: FileSource = isFilteredMode
+		? "filtered"
+		: isTagMode
+			? "tag"
+			: isRecentsMode
+				? "recents"
+				: isSearchMode
+					? "search"
+					: isVirtualView
+						? "virtual"
+						: "directory";
 
 	const files = useMemo(() => {
+		if (isFilteredMode) {
+			return (
+				(filteredQuery.data as FileSearchOutput | undefined)?.files || []
+			);
+		}
 		if (isTagMode) {
 			return (tagQuery.data as { files: File[] } | undefined)?.files ?? [];
 		}
@@ -191,17 +264,31 @@ export function useExplorerFiles(): ExplorerFilesResult {
 			return virtualFiles || [];
 		}
 		return (directoryQuery.data as { files: File[] } | undefined)?.files ?? [];
-	}, [isTagMode, isRecentsMode, isSearchMode, isVirtualView, tagQuery.data, recentsQuery.data, searchQuery.data, virtualFiles, directoryQuery.data]);
+	}, [
+		isFilteredMode,
+		isTagMode,
+		isRecentsMode,
+		isSearchMode,
+		isVirtualView,
+		filteredQuery.data,
+		tagQuery.data,
+		recentsQuery.data,
+		searchQuery.data,
+		virtualFiles,
+		directoryQuery.data,
+	]);
 
-	const isLoading = isTagMode
-		? tagQuery.isLoading
-		: isRecentsMode
-			? recentsQuery.isLoading
-			: isSearchMode
-				? searchQuery.isLoading
-				: isVirtualView
-					? false
-					: directoryQuery.isLoading;
+	const isLoading = isFilteredMode
+		? filteredQuery.isLoading
+		: isTagMode
+			? tagQuery.isLoading
+			: isRecentsMode
+				? recentsQuery.isLoading
+				: isSearchMode
+					? searchQuery.isLoading
+					: isVirtualView
+						? false
+						: directoryQuery.isLoading;
 
 	return { files, isLoading, source };
 }
